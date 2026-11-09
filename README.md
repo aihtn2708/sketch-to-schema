@@ -54,6 +54,14 @@ Claude API notes:
   - **1 → many** (M): drag from the "one" table to the "many" table; it draws a bar and a crow's foot.
   - **Line** (L), **Eraser** (E), **Undo** (Ctrl/⌘+Z), **Clear**.
   - The drawing is saved in your browser as you go.
+- **During a meeting:**
+  - **Board:** Standard, Wide or Large drawing space. Bigger boards raise the text size so it stays readable.
+  - **Text:** Small, Medium or Large for new text.
+  - **Zoom:** −, + and **Fit** (keys −, + and 0, or Ctrl/⌘ + scroll).
+  - **Hand** (H): drag to move around a zoomed board. You can also hold Space and drag, or drag with the middle mouse button.
+  - **Meeting mode:** hides everything except the board and its tools. Press Esc to leave.
+  - **Full screen:** meeting mode with the browser's full screen. Good for screen sharing.
+  - Extract sends only the part of the board you drew on, so big boards still read well.
 - **Extract schema**, then check anything highlighted in amber. Editing a field or pressing **Looks right** clears its flag.
 - Copy **PostgreSQL DDL** or **DBML** from Export.
 

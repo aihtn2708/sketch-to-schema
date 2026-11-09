@@ -142,6 +142,26 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 .empty { text-align: center; color: var(--muted); padding: 28px 12px; border: 1px dashed var(--line); border-radius: 10px; }
 pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-height: 1.6; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow: auto; max-height: 460px; white-space: pre; tab-size: 2; }
 .copied { font-size: 12.5px; color: var(--accent); }
+
+/* View controls for Draw mode */
+.viewbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.viewbar select { width: auto; padding: 5px 8px; font-size: 13px; }
+.viewbar .sep, .toolbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.zoom-val { min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink); }
+.board.drawing { overflow: auto; max-height: min(75vh, 900px); overscroll-behavior: contain; }
+.board.drawing canvas { max-width: none; margin: 0 auto; }
+.board.drawing.t-pan canvas { cursor: grab; }
+.board.drawing.panning canvas { cursor: grabbing; }
+
+/* Meeting mode: the board takes the whole window */
+body.meeting { padding-block: 8px; }
+body.meeting header, body.meeting #connPanel, body.meeting #draftPanel, body.meeting #outPanel,
+body.meeting .source, body.meeting .privacy-note { display: none; }
+body.meeting .wrap { max-width: none; }
+body.meeting .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch"; }
+body.meeting #sketchPanel { height: calc(100vh - 16px); height: calc(100dvh - 16px); display: flex; flex-direction: column; }
+body.meeting #sketchPanel > .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding-block: 10px; }
+body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
 </style>
 </head>
 <body>
@@ -152,7 +172,7 @@ pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-hei
   </header>
 
   <!-- AI connection: each person uses their own key, kept in this browser -->
-  <section class="panel" aria-labelledby="connTitle">
+  <section class="panel" id="connPanel" aria-labelledby="connTitle">
     <div class="panel-head">
       <h2 id="connTitle">AI connection</h2>
       <div class="conn-status"><span class="dot" id="connDot"></span><span id="connText" class="hint">No key yet</span></div>
@@ -215,9 +235,32 @@ pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-hei
           <button type="button" class="tool" data-tool="many" aria-pressed="false" title="Drag from the 'one' side to the 'many' side (M)">1 → many</button>
           <button type="button" class="tool" data-tool="pen" aria-pressed="false" title="Freehand (P)">Pen</button>
           <button type="button" class="tool" data-tool="eraser" aria-pressed="false" title="Click or drag over a shape to remove it (E)">Eraser</button>
+          <button type="button" class="tool" data-tool="pan" aria-pressed="false" title="Drag to move around the board (H, or hold Space)">Hand</button>
           <span class="sep" aria-hidden="true"></span>
           <button type="button" class="tool" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
           <button type="button" class="tool" id="clearBtn">Clear</button>
+        </div>
+        <div class="viewbar" id="viewBar" hidden>
+          <label for="boardSize">Board</label>
+          <select class="in" id="boardSize">
+            <option value="1200x760">Standard</option>
+            <option value="1800x1100">Wide</option>
+            <option value="2600x1600">Large</option>
+          </select>
+          <label for="textSize">Text</label>
+          <select class="in" id="textSize">
+            <option value="24">Small</option>
+            <option value="30">Medium</option>
+            <option value="40">Large</option>
+          </select>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="tool" id="zoomOut" aria-label="Zoom out" title="Zoom out (Ctrl + scroll)">−</button>
+          <span class="zoom-val" id="zoomVal" aria-live="polite">Fit</span>
+          <button type="button" class="tool" id="zoomIn" aria-label="Zoom in" title="Zoom in (Ctrl + scroll)">+</button>
+          <button type="button" class="tool" id="zoomFit" title="Fit the board to the window (0)">Fit</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="tool" id="meetingBtn" aria-pressed="false" title="Hide everything but the board (Esc to leave)">Meeting mode</button>
+          <button type="button" class="tool" id="fsBtn">Full screen</button>
         </div>
         <div class="board" id="board">
           <canvas id="sketch" width="1200" height="760" aria-label="The sketch being read"></canvas>
@@ -238,7 +281,7 @@ pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-hei
           <button class="primary" type="button" id="extractBtn">Extract schema</button>
         </div>
         <p class="msg" id="msg" hidden></p>
-        <p class="hint">The sketch is sent straight from your browser to the provider you chose, only when you press Extract. Free OpenRouter models may log what they receive, so don't send confidential designs.</p>
+        <p class="hint privacy-note">The sketch is sent straight from your browser to the provider you chose, only when you press Extract. Free OpenRouter models may log what they receive, so don't send confidential designs.</p>
       </div>
     </section>
 
@@ -707,40 +750,50 @@ let history = [];
 let tool = "box";
 let drag = null;              // in-progress shape while the pointer is down
 let erasing = false;
+let boardW = 1200, boardH = 760;   // drawing board size in canvas pixels
+let zoom = "fit";                  // "fit" or a number (1 = 100%)
+let textSize = 30;
+let pan = null, spaceDown = false;
+(() => {
+  const [w, h] = (store.get("s2s.boardSize") || "").split("x").map(Number);
+  if (w >= 600 && h >= 400) { boardW = w; boardH = h; }
+  const ts = Number(store.get("s2s.textSize")); if ([24, 30, 40].includes(ts)) textSize = ts;
+})();
 try { const saved = JSON.parse(store.get("s2s.drawing") || "[]"); if (Array.isArray(saved)) shapes = saved; } catch {}
 
 function pushHistory() { history.push(JSON.stringify(shapes)); if (history.length > 100) history.shift(); }
 function saveDrawing() { store.set("s2s.drawing", JSON.stringify(shapes)); }
 
-function crowFoot(x, ux, uy, px, py) {
-  const bx = px - ux * 24, by = py - uy * 24;
-  for (const s of [-1, 0, 1]) { x.beginPath(); x.moveTo(bx, by); x.lineTo(px - uy * 13 * s, py + ux * 13 * s); x.stroke(); }
+function crowFoot(x, ux, uy, px, py, sf = 1) {
+  const bx = px - ux * 24 * sf, by = py - uy * 24 * sf;
+  for (const s of [-1, 0, 1]) { x.beginPath(); x.moveTo(bx, by); x.lineTo(px - uy * 13 * sf * s, py + ux * 13 * sf * s); x.stroke(); }
 }
 function paintShape(x, s) {
+  const sf = Math.max(1, boardW / 1200);   // thicker strokes on bigger boards, so they read the same at Fit
   x.strokeStyle = INK; x.fillStyle = INK; x.lineCap = "round"; x.lineJoin = "round";
   if (s.type === "pen") {
-    x.lineWidth = 3; x.beginPath();
+    x.lineWidth = 3 * sf; x.beginPath();
     s.pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
     if (s.pts.length === 1) x.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]);
     x.stroke();
   } else if (s.type === "box") {
-    x.lineWidth = 3; x.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+    x.lineWidth = 3 * sf; x.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
   } else if (s.type === "line" || s.type === "many") {
-    x.lineWidth = 2.6; x.beginPath(); x.moveTo(s.x1, s.y1); x.lineTo(s.x2, s.y2); x.stroke();
+    x.lineWidth = 2.6 * sf; x.beginPath(); x.moveTo(s.x1, s.y1); x.lineTo(s.x2, s.y2); x.stroke();
     const L = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
-    if (s.type === "many" && L > 30) {
+    if (s.type === "many" && L > 30 * sf) {
       const ux = (s.x2 - s.x1) / L, uy = (s.y2 - s.y1) / L;
-      crowFoot(x, ux, uy, s.x2, s.y2);
+      crowFoot(x, ux, uy, s.x2, s.y2, sf);
       // "one" end: a short bar across the line
-      const ox = s.x1 + ux * 14, oy = s.y1 + uy * 14;
-      x.beginPath(); x.moveTo(ox - uy * 11, oy + ux * 11); x.lineTo(ox + uy * 11, oy - ux * 11); x.stroke();
+      const ox = s.x1 + ux * 14 * sf, oy = s.y1 + uy * 14 * sf;
+      x.beginPath(); x.moveTo(ox - uy * 11 * sf, oy + ux * 11 * sf); x.lineTo(ox + uy * 11 * sf, oy - ux * 11 * sf); x.stroke();
     }
   } else if (s.type === "text") {
     x.font = `${s.size || 30}px Kalam, "Comic Sans MS", cursive`; x.textBaseline = "alphabetic"; x.fillText(s.text, s.x, s.y);
   }
 }
 function drawBoard(withGrid = true) {
-  cv.width = 1200; cv.height = 760;
+  cv.width = boardW; cv.height = boardH;
   cx.fillStyle = "#fbfbf9"; cx.fillRect(0, 0, cv.width, cv.height);
   if (withGrid) {
     cx.fillStyle = "rgba(60,80,75,0.16)";
@@ -750,7 +803,95 @@ function drawBoard(withGrid = true) {
   if (drag) paintShape(cx, drag);
   $("#drawHint").hidden = mode !== "draw" || shapes.length > 0 || !!drag;
 }
-function redraw() { if (mode === "draw") drawBoard(true); else drawPhoto(); }
+function redraw() { if (mode === "draw") drawBoard(true); else drawPhoto(); applyZoom(); }
+
+/* ---------- Zoom, board size, meeting mode ---------- */
+const ZOOM_STEPS = [0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3];
+const inMeeting = () => document.body.classList.contains("meeting");
+function fitZoom() {
+  const availW = Math.max(100, board.clientWidth - 2);
+  const availH = inMeeting() ? Math.max(100, board.clientHeight - 2) : Infinity;
+  return Math.min(availW / boardW, availH / boardH);
+}
+function currentZoom() { return zoom === "fit" ? fitZoom() : zoom; }
+function applyZoom() {
+  if (mode !== "draw") { cv.style.width = ""; return; }
+  const z = currentZoom();
+  cv.style.width = Math.round(boardW * z) + "px";
+  $("#zoomVal").textContent = zoom === "fit" ? `Fit · ${Math.round(z * 100)}%` : `${Math.round(z * 100)}%`;
+}
+function setZoom(z) {
+  // Keep the point at the middle of the view in place while zooming.
+  const rx = (board.scrollLeft + board.clientWidth / 2) / Math.max(1, cv.offsetWidth);
+  const ry = (board.scrollTop + board.clientHeight / 2) / Math.max(1, cv.offsetHeight);
+  zoom = z; applyZoom();
+  board.scrollLeft = rx * cv.offsetWidth - board.clientWidth / 2;
+  board.scrollTop = ry * cv.offsetHeight - board.clientHeight / 2;
+}
+function stepZoom(dir) {
+  const z = currentZoom();
+  const next = dir > 0 ? ZOOM_STEPS.find((s) => s > z + 0.001) : [...ZOOM_STEPS].reverse().find((s) => s < z - 0.001);
+  if (next) setZoom(next);
+}
+$("#zoomIn").addEventListener("click", () => stepZoom(1));
+$("#zoomOut").addEventListener("click", () => stepZoom(-1));
+$("#zoomFit").addEventListener("click", () => setZoom("fit"));
+board.addEventListener("wheel", (e) => {
+  if (mode !== "draw" || !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault(); stepZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+addEventListener("resize", () => applyZoom());
+
+// Area actually drawn on, in canvas pixels.
+function contentBounds() {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  for (const s of shapes) {
+    if (s.type === "pen") s.pts.forEach(([x, y]) => add(x, y));
+    else if (s.type === "text") {
+      cx.font = `${s.size || 30}px Kalam, cursive`;
+      add(s.x, s.y - (s.size || 30)); add(s.x + cx.measureText(s.text).width, s.y + 8);
+    } else { add(s.x1, s.y1); add(s.x2, s.y2); }
+  }
+  return x0 === Infinity ? null : { x0, y0, x1, y1 };
+}
+$("#boardSize").value = `${boardW}x${boardH}`;
+$("#boardSize").addEventListener("change", (e) => {
+  const [w, h] = e.target.value.split("x").map(Number);
+  const b = contentBounds();
+  if (b && (b.x1 > w || b.y1 > h)) {
+    showMsg("Your drawing doesn't fit on that board. Pick a bigger size, or move or erase shapes near the right and bottom edges first.", true);
+    e.target.value = `${boardW}x${boardH}`; return;
+  }
+  boardW = w; boardH = h; store.set("s2s.boardSize", e.target.value);
+  const suggested = w >= 2600 ? 40 : w >= 1800 ? 30 : textSize;   // keep text readable at Fit
+  if (suggested > textSize) { textSize = suggested; $("#textSize").value = String(textSize); store.set("s2s.textSize", String(textSize)); }
+  zoom = "fit"; drawBoard(); applyZoom(); showMsg("");
+});
+$("#textSize").value = String(textSize);
+$("#textSize").addEventListener("change", (e) => { textSize = Number(e.target.value); store.set("s2s.textSize", e.target.value); });
+
+function setMeeting(on) {
+  closeTextInput(true);
+  if (on && mode !== "draw") setMode("draw");
+  document.body.classList.toggle("meeting", on);
+  $("#meetingBtn").setAttribute("aria-pressed", on);
+  $("#meetingBtn").textContent = on ? "Exit meeting mode" : "Meeting mode";
+  if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  if (on) zoom = "fit";
+  requestAnimationFrame(applyZoom);
+}
+$("#meetingBtn").addEventListener("click", () => setMeeting(!inMeeting()));
+if (!document.fullscreenEnabled) $("#fsBtn").hidden = true;
+$("#fsBtn").addEventListener("click", () => {
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+  setMeeting(true);
+  document.documentElement.requestFullscreen?.().catch(() => showMsg("Full screen isn't available in this browser. Meeting mode is on instead."));
+});
+document.addEventListener("fullscreenchange", () => {
+  $("#fsBtn").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen";
+  requestAnimationFrame(applyZoom);
+});
 
 function toCanvas(e) {
   const r = cv.getBoundingClientRect();
@@ -782,8 +923,13 @@ function eraseAt(px, py) {
 }
 
 cv.addEventListener("pointerdown", (e) => {
-  if (mode !== "draw" || e.button > 0) return;
+  if (mode !== "draw" || e.button > 1) return;
   e.preventDefault();
+  if (tool === "pan" || spaceDown || e.button === 1) {
+    closeTextInput(true);
+    pan = { x: e.clientX, y: e.clientY, sl: board.scrollLeft, st: board.scrollTop };
+    cv.setPointerCapture(e.pointerId); board.classList.add("panning"); return;
+  }
   const [px, py] = toCanvas(e);
   if (tool === "text") { openTextInput(px, py); return; }
   cv.setPointerCapture(e.pointerId);
@@ -794,6 +940,7 @@ cv.addEventListener("pointerdown", (e) => {
 });
 cv.addEventListener("pointermove", (e) => {
   if (mode !== "draw") return;
+  if (pan) { board.scrollLeft = pan.sl - (e.clientX - pan.x); board.scrollTop = pan.st - (e.clientY - pan.y); return; }
   const [px, py] = toCanvas(e);
   if (erasing) { if (eraseAt(px, py)) erasing.any = true; return; }
   if (!drag) return;
@@ -801,6 +948,7 @@ cv.addEventListener("pointermove", (e) => {
   drawBoard();
 });
 function endStroke() {
+  if (pan) { pan = null; board.classList.remove("panning"); return; }
   if (erasing) {
     if (erasing.any) { history.push(erasing.snap); if (history.length > 100) history.shift(); saveDrawing(); }
     erasing = false; return;
@@ -819,11 +967,12 @@ let textBox = null;
 function openTextInput(px, py) {
   closeTextInput(true);
   const r = cv.getBoundingClientRect(), br = board.getBoundingClientRect(), k = r.width / cv.width;
-  const size = 30;
+  const size = textSize;
   const inp = document.createElement("input");
   inp.className = "text-input"; inp.type = "text"; inp.setAttribute("aria-label", "Text to add");
-  inp.style.left = (r.left - br.left + px * k) + "px";
-  inp.style.top = (r.top - br.top + (py - size) * k) + "px";
+  // The board scrolls, so offsets include its scroll position.
+  inp.style.left = (r.left - br.left + board.scrollLeft + px * k) + "px";
+  inp.style.top = (r.top - br.top + board.scrollTop + (py - size) * k) + "px";
   inp.style.fontSize = Math.max(12, size * k) + "px";
   inp.style.height = Math.max(18, (size + 10) * k) + "px";
   board.appendChild(inp);
@@ -831,8 +980,8 @@ function openTextInput(px, py) {
   inp.focus();
   requestAnimationFrame(() => { if (textBox?.inp === inp && document.activeElement !== inp) inp.focus(); });
   inp.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") { ev.preventDefault(); const next = textBox ? { x: textBox.x, y: textBox.y + 40 } : null; closeTextInput(true); if (next && ev.shiftKey === false && next.y < cv.height - 10) openTextInput(next.x, next.y - 4); }
-    if (ev.key === "Escape") { ev.preventDefault(); closeTextInput(false); }
+    if (ev.key === "Enter") { ev.preventDefault(); const next = textBox ? { x: textBox.x, y: textBox.y + Math.round(textBox.size * 1.35) } : null; closeTextInput(true); if (next && ev.shiftKey === false && next.y < cv.height - 10) openTextInput(next.x, next.y - 4); }
+    if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); closeTextInput(true); }
   });
   inp.addEventListener("blur", () => setTimeout(() => { if (textBox?.inp === inp) closeTextInput(true); }, 0));
 }
@@ -850,6 +999,7 @@ function setTool(t) {
   tool = t;
   document.querySelectorAll("#drawBar [data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
   board.classList.toggle("t-eraser", t === "eraser"); board.classList.toggle("t-text", t === "text");
+  board.classList.toggle("t-pan", t === "pan" || spaceDown);
 }
 document.querySelectorAll("#drawBar [data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
 function undo() { if (!history.length) return; shapes = JSON.parse(history.pop()); saveDrawing(); drawBoard(); }
@@ -864,14 +1014,25 @@ $("#clearBtn").addEventListener("click", () => {
 document.addEventListener("keydown", (e) => {
   if (mode !== "draw" || e.target.closest("input, textarea, select")) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
-  const map = { b: "box", t: "text", l: "line", m: "many", p: "pen", e: "eraser" };
+  if (e.code === "Space") { e.preventDefault(); if (!spaceDown) { spaceDown = true; board.classList.add("t-pan"); } return; }
+  if (e.key === "Escape" && inMeeting()) { setMeeting(false); return; }
+  if (e.key === "0" && !e.ctrlKey && !e.metaKey) { setZoom("fit"); return; }
+  if ((e.key === "+" || e.key === "=") && !e.ctrlKey && !e.metaKey) { stepZoom(1); return; }
+  if (e.key === "-" && !e.ctrlKey && !e.metaKey) { stepZoom(-1); return; }
+  const map = { b: "box", t: "text", l: "line", m: "many", p: "pen", e: "eraser", h: "pan" };
   if (!e.ctrlKey && !e.metaKey && !e.altKey && map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
+});
+document.addEventListener("keyup", (e) => {
+  // preventDefault stops a focused toolbar button from being "clicked" by the Space release.
+  if (e.code === "Space" && spaceDown) { e.preventDefault(); spaceDown = false; board.classList.toggle("t-pan", tool === "pan"); }
 });
 
 /* Mode switch */
 function setMode(m) {
   closeTextInput(true);
+  if (m === "photo" && inMeeting()) setMeeting(false);
   mode = m;
+  $("#viewBar").hidden = m !== "draw";
   $("#modePhoto").setAttribute("aria-selected", m === "photo");
   $("#modeDraw").setAttribute("aria-selected", m === "draw");
   $("#photoBar").hidden = m !== "photo";
@@ -942,13 +1103,24 @@ const SCHEMA = {
 };
 
 function prepareImage(maxEdge = 1300) {
-  if (mode === "draw") drawBoard(false);          // send the drawing without the dot grid
-  const scale = Math.min(1, maxEdge / Math.max(cv.width, cv.height));
+  // Photo: whole image. Drawing: only the area drawn on (plus a margin), without the dot grid,
+  // so a large board doesn't shrink the text before the model reads it.
+  let sx = 0, sy = 0, sw = cv.width, sh = cv.height;
+  if (mode === "draw") {
+    drawBoard(false);
+    const b = contentBounds();
+    if (b) {
+      const m = 40;
+      sx = Math.max(0, Math.floor(b.x0 - m)); sy = Math.max(0, Math.floor(b.y0 - m));
+      sw = Math.min(cv.width, Math.ceil(b.x1 + m)) - sx; sh = Math.min(cv.height, Math.ceil(b.y1 + m)) - sy;
+    }
+  }
+  const scale = Math.min(1, maxEdge / Math.max(sw, sh));
   const c = document.createElement("canvas");
-  c.width = Math.round(cv.width * scale); c.height = Math.round(cv.height * scale);
+  c.width = Math.max(1, Math.round(sw * scale)); c.height = Math.max(1, Math.round(sh * scale));
   const g = c.getContext("2d");
   g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
-  g.drawImage(cv, 0, 0, c.width, c.height);
+  g.drawImage(cv, sx, sy, sw, sh, 0, 0, c.width, c.height);
   if (mode === "draw") drawBoard(true);
   return c.toDataURL("image/jpeg", 0.88);
 }
@@ -1053,7 +1225,7 @@ $("#extractBtn").addEventListener("click", async () => {
     }
     schema = next; snapshot(); render();
     const n = schema.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
-    showMsg(`Drafted ${schema.tables.length} tables with ${out.model}. ${n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over."}`);
+    showMsg(`Drafted ${schema.tables.length} tables with ${out.model}. ${n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over."}${inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""}`);
   } catch (e) {
     if (e?.name === "AbortError") showMsg("Stopped. The draft wasn't changed.");
     else showMsg(e?.message || "Extraction failed. Try again.", true);
