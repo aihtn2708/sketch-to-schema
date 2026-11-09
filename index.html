@@ -143,6 +143,14 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-height: 1.6; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow: auto; max-height: 460px; white-space: pre; tab-size: 2; }
 .copied { font-size: 12.5px; color: var(--accent); }
 
+/* Toolbar icons */
+.tool svg { width: 18px; height: 18px; flex: none; }
+.tool:not(:has(.lbl)) { padding-inline: 8px; }
+@media (max-width: 640px) {
+  .tool .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tool { padding: 7px 8px; }
+}
+
 /* View controls for Draw mode */
 .viewbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
 .viewbar select { width: auto; padding: 5px 8px; font-size: 13px; }
@@ -229,16 +237,16 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
           <button class="quiet" id="useExample" type="button">Use example</button>
         </div>
         <div class="toolbar" id="drawBar" hidden role="toolbar" aria-label="Drawing tools">
-          <button type="button" class="tool" data-tool="box" aria-pressed="true" title="Drag to draw a table box (B)">Box</button>
-          <button type="button" class="tool" data-tool="text" aria-pressed="false" title="Click to type a name (T)">Text</button>
-          <button type="button" class="tool" data-tool="line" aria-pressed="false" title="Drag to connect (L)">Line</button>
-          <button type="button" class="tool" data-tool="many" aria-pressed="false" title="Drag from the 'one' side to the 'many' side (M)">1 → many</button>
-          <button type="button" class="tool" data-tool="pen" aria-pressed="false" title="Freehand (P)">Pen</button>
-          <button type="button" class="tool" data-tool="eraser" aria-pressed="false" title="Click or drag over a shape to remove it (E)">Eraser</button>
-          <button type="button" class="tool" data-tool="pan" aria-pressed="false" title="Drag to move around the board (H, or hold Space)">Hand</button>
+          <button type="button" class="tool" data-tool="box" data-icon="box" aria-pressed="true" title="Drag to draw a table box (B)"><span class="lbl">Box</span></button>
+          <button type="button" class="tool" data-tool="text" data-icon="text" aria-pressed="false" title="Click to type a name (T)"><span class="lbl">Text</span></button>
+          <button type="button" class="tool" data-tool="line" data-icon="line" aria-pressed="false" title="Drag to connect (L)"><span class="lbl">Line</span></button>
+          <button type="button" class="tool" data-tool="many" data-icon="many" aria-pressed="false" title="Drag from the 'one' side to the 'many' side (M)"><span class="lbl">1 → many</span></button>
+          <button type="button" class="tool" data-tool="pen" data-icon="pen" aria-pressed="false" title="Freehand (P)"><span class="lbl">Pen</span></button>
+          <button type="button" class="tool" data-tool="eraser" data-icon="eraser" aria-pressed="false" title="Click or drag over a shape to remove it (E)"><span class="lbl">Eraser</span></button>
+          <button type="button" class="tool" data-tool="pan" data-icon="hand" aria-pressed="false" title="Drag to move around the board (H, or hold Space)"><span class="lbl">Hand</span></button>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" class="tool" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
-          <button type="button" class="tool" id="clearBtn">Clear</button>
+          <button type="button" class="tool" id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)"><span class="lbl">Undo</span></button>
+          <button type="button" class="tool" id="clearBtn" data-icon="trash" title="Remove everything from the board"><span class="lbl">Clear</span></button>
         </div>
         <div class="viewbar" id="viewBar" hidden>
           <label for="boardSize">Board</label>
@@ -254,13 +262,13 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
             <option value="40">Large</option>
           </select>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" class="tool" id="zoomOut" aria-label="Zoom out" title="Zoom out (Ctrl + scroll)">−</button>
+          <button type="button" class="tool" id="zoomOut" data-icon="zoomOut" aria-label="Zoom out" title="Zoom out (−, or Ctrl + scroll)"></button>
           <span class="zoom-val" id="zoomVal" aria-live="polite">Fit</span>
-          <button type="button" class="tool" id="zoomIn" aria-label="Zoom in" title="Zoom in (Ctrl + scroll)">+</button>
-          <button type="button" class="tool" id="zoomFit" title="Fit the board to the window (0)">Fit</button>
+          <button type="button" class="tool" id="zoomIn" data-icon="zoomIn" aria-label="Zoom in" title="Zoom in (+, or Ctrl + scroll)"></button>
+          <button type="button" class="tool" id="zoomFit" data-icon="fit" title="Fit the board to the window (0)"><span class="lbl">Fit</span></button>
           <span class="sep" aria-hidden="true"></span>
-          <button type="button" class="tool" id="meetingBtn" aria-pressed="false" title="Hide everything but the board (Esc to leave)">Meeting mode</button>
-          <button type="button" class="tool" id="fsBtn">Full screen</button>
+          <button type="button" class="tool" id="meetingBtn" data-icon="meeting" aria-pressed="false" title="Hide everything but the board (Esc to leave)"><span class="lbl">Meeting mode</span></button>
+          <button type="button" class="tool" id="fsBtn" data-icon="fullscreen" title="Full screen"><span class="lbl">Full screen</span></button>
         </div>
         <div class="board" id="board">
           <canvas id="sketch" width="1200" height="760" aria-label="The sketch being read"></canvas>
@@ -743,6 +751,29 @@ function drawPhoto() {
   cx.drawImage(photoImg, 0, 0, cv.width, cv.height);
 }
 
+/* ---------- Toolbar icons (inline SVG, 24×24, drawn with currentColor) ---------- */
+const ICONS = {
+  box: '<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 9h16"/>',
+  text: '<path d="M5 6h14M12 6v13M9 19h6"/>',
+  line: '<path d="M5 19L19 5"/>',
+  many: '<path d="M3 12h13M6 8v8M16 12l5-5M16 12h5M16 12l5 5"/>',
+  pen: '<path d="M4 20l1-4L16 5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14 7l3 3"/>',
+  eraser: '<path d="M7 20l-3-3a2 2 0 0 1 0-3L13 5a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3l-8 8z"/><path d="M9 10l5 5M12 20h8"/>',
+  hand: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.8 14a1.5 1.5 0 0 1 2.4-1.8L8 14.5"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  zoomOut: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/>',
+  zoomIn: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6M11 8v6"/>',
+  fit: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+  meeting: '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>',
+  fullscreen: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'
+};
+document.querySelectorAll("[data-icon]").forEach((el) => {
+  const d = ICONS[el.dataset.icon];
+  if (d) el.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`);
+});
+function setLabel(sel, text) { const l = $(sel)?.querySelector(".lbl"); if (l) l.textContent = text; }
+
 /* ---------- Draw mode ---------- */
 const INK = "#1f2328";
 let shapes = [];
@@ -876,7 +907,7 @@ function setMeeting(on) {
   if (on && mode !== "draw") setMode("draw");
   document.body.classList.toggle("meeting", on);
   $("#meetingBtn").setAttribute("aria-pressed", on);
-  $("#meetingBtn").textContent = on ? "Exit meeting mode" : "Meeting mode";
+  setLabel("#meetingBtn", on ? "Exit meeting mode" : "Meeting mode");
   if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   if (on) zoom = "fit";
   requestAnimationFrame(applyZoom);
@@ -889,7 +920,7 @@ $("#fsBtn").addEventListener("click", () => {
   document.documentElement.requestFullscreen?.().catch(() => showMsg("Full screen isn't available in this browser. Meeting mode is on instead."));
 });
 document.addEventListener("fullscreenchange", () => {
-  $("#fsBtn").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen";
+  setLabel("#fsBtn", document.fullscreenElement ? "Exit full screen" : "Full screen");
   requestAnimationFrame(applyZoom);
 });
 
@@ -1007,8 +1038,8 @@ $("#undoBtn").addEventListener("click", undo);
 let clearArmed = false;
 $("#clearBtn").addEventListener("click", () => {
   if (!shapes.length) return;
-  if (!clearArmed) { clearArmed = true; $("#clearBtn").textContent = "Click again to clear"; setTimeout(() => { clearArmed = false; $("#clearBtn").textContent = "Clear"; }, 2500); return; }
-  clearArmed = false; $("#clearBtn").textContent = "Clear";
+  if (!clearArmed) { clearArmed = true; setLabel("#clearBtn", "Click again to clear"); setTimeout(() => { clearArmed = false; setLabel("#clearBtn", "Clear"); }, 2500); return; }
+  clearArmed = false; setLabel("#clearBtn", "Clear");
   pushHistory(); shapes = []; saveDrawing(); drawBoard();
 });
 document.addEventListener("keydown", (e) => {
