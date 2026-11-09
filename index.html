@@ -46,8 +46,9 @@ a { color: var(--accent); }
 .panel-body { padding: 16px 18px; display: grid; gap: 14px; }
 
 /* AI connection */
-.conn { display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; }
-@media (max-width: 760px) { .conn { grid-template-columns: minmax(0, 1fr); } }
+.conn { display: grid; gap: 12px; grid-template-columns: minmax(170px, auto) minmax(0, 1.1fr) minmax(0, 1fr) auto; align-items: end; }
+@media (max-width: 1000px) { .conn { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 640px) { .conn { grid-template-columns: minmax(0, 1fr); } }
 .field { display: grid; gap: 5px; min-width: 0; }
 .field > span { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
 .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
@@ -143,6 +144,41 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-height: 1.6; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow: auto; max-height: 460px; white-space: pre; tab-size: 2; }
 .copied { font-size: 12.5px; color: var(--accent); }
 
+/* Project bar */
+.projbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
+.proj-icon { display: inline-flex; color: var(--accent); flex: none; }
+.proj-icon svg { width: 20px; height: 20px; }
+.proj-name { font-weight: 600; font-size: 16px; flex: 1 1 220px; min-width: 0; border-color: transparent; background: transparent; }
+.proj-name:hover, .proj-name:focus { border-color: var(--line); background: var(--surface); }
+.save-state { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.save-state.err { color: var(--danger); white-space: normal; }
+button svg, .btn svg { width: 18px; height: 18px; flex: none; }
+body.meeting #projBar { display: none; }
+
+/* Projects dialog */
+dialog.proj-dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(760px, calc(100vw - 32px)); max-height: min(82vh, 760px); background: var(--surface); color: var(--ink); }
+dialog.proj-dialog[open] { display: flex; flex-direction: column; }
+dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
+.dlg-head { display: flex; gap: 10px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.dlg-head h2 { margin: 0; font-size: 16px; flex: none; }
+.dlg-head input { flex: 1; min-width: 0; }
+.dlg-body { padding: 12px 16px 16px; display: grid; gap: 10px; overflow: auto; min-height: 0; }
+.proj-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.proj-item { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+.proj-item.current { border-color: var(--accent); }
+.proj-thumb { width: 96px; height: 60px; object-fit: cover; border-radius: 6px; background: var(--sunk); border: 1px solid var(--line); display: block; }
+.proj-meta { min-width: 0; display: grid; gap: 2px; }
+.proj-meta b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.proj-meta span { font-size: 12.5px; color: var(--muted); }
+.proj-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.proj-actions button { padding: 5px 9px; font-size: 13px; }
+.proj-actions .danger:hover { color: var(--danger); border-color: var(--danger); }
+@media (max-width: 640px) {
+  .proj-item { grid-template-columns: 72px minmax(0, 1fr); }
+  .proj-thumb { width: 72px; height: 46px; }
+  .proj-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
 /* Toolbar icons */
 .tool svg { width: 18px; height: 18px; flex: none; }
 .tool:not(:has(.lbl)) { padding-inline: 8px; }
@@ -179,6 +215,20 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
     <p class="lede">Upload a photo of a whiteboard ER diagram, or draw one here. An AI model drafts the tables; you check anything it marked, then copy PostgreSQL DDL or DBML.</p>
   </header>
 
+  <!-- Project: everything on this page is saved as a project in this browser -->
+  <section class="panel projbar" id="projBar" aria-label="Project">
+    <span class="proj-icon" data-icon="folder" aria-hidden="true"></span>
+    <input class="in proj-name" id="projName" aria-label="Project name" spellcheck="false" maxlength="120" value="Untitled project">
+    <span class="save-state" id="saveState" role="status"></span>
+    <div class="actions">
+      <button type="button" id="newProj" data-icon="plus">New</button>
+      <button type="button" id="openProj" data-icon="folder">Projects</button>
+      <button type="button" id="exportProj" data-icon="download" title="Save this project as a file to back up or share">Export</button>
+      <label class="btn" for="importFile" data-icon="upload" title="Open a project file someone exported">Import</label>
+      <input class="file-input" type="file" id="importFile" accept=".json,application/json">
+    </div>
+  </section>
+
   <!-- AI connection: each person uses their own key, kept in this browser -->
   <section class="panel" id="connPanel" aria-labelledby="connTitle">
     <div class="panel-head">
@@ -187,16 +237,24 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
     </div>
     <div class="panel-body">
       <div class="conn">
-        <div class="field">
+        <label class="field" for="provider">
           <span>Provider</span>
-          <div class="seg" role="group" aria-label="Provider">
-            <button type="button" id="provOR" aria-pressed="true">OpenRouter (free models)</button>
-            <button type="button" id="provAN" aria-pressed="false">Claude API</button>
-          </div>
-        </div>
+          <select class="in" id="provider">
+            <option value="openrouter">OpenRouter (free models)</option>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="openai">ChatGPT (OpenAI)</option>
+            <option value="anthropic">Claude (Anthropic)</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </label>
         <label class="field" for="apiKey">
-          <span id="keyLabel">OpenRouter API key</span>
-          <input class="in in-key" id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…">
+          <span id="keyLabel">API key</span>
+          <input class="in in-key" id="apiKey" type="password" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field" for="model">
+          <span id="modelLabel">Model</span>
+          <input class="in in-key" id="model" list="modelList" autocomplete="off" spellcheck="false">
+          <datalist id="modelList"></datalist>
         </label>
         <div class="actions">
           <label class="check"><input type="checkbox" id="remember" checked> Remember on this device</label>
@@ -204,20 +262,6 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
         </div>
       </div>
       <p class="hint" id="provHint"></p>
-      <details class="more">
-        <summary>Model settings</summary>
-        <div class="field" id="orModelsWrap">
-          <label for="orModels"><span class="hint">OpenRouter models to try, in order (comma-separated). Free models change often; find current ones at <a href="https://openrouter.ai/models?q=:free" target="_blank" rel="noopener">openrouter.ai/models</a> with Input → Image.</span></label>
-          <input class="in in-key" id="orModels" spellcheck="false">
-        </div>
-        <div class="field" id="anModelWrap" hidden>
-          <label for="anModel"><span class="hint">Claude model. Haiku is the cheapest (about $0.001 per extraction).</span></label>
-          <select class="in in-key" id="anModel">
-            <option value="claude-haiku-5-5">claude-haiku-5-5 (cheapest)</option>
-            <option value="claude-sonnet-5-5">claude-sonnet-5-5 (stronger reading)</option>
-          </select>
-        </div>
-      </details>
     </div>
   </section>
 
@@ -289,7 +333,7 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
           <button class="primary" type="button" id="extractBtn">Extract schema</button>
         </div>
         <p class="msg" id="msg" hidden></p>
-        <p class="hint privacy-note">The sketch is sent straight from your browser to the provider you chose, only when you press Extract. Free OpenRouter models may log what they receive, so don't send confidential designs.</p>
+        <p class="hint privacy-note">The sketch is sent straight from your browser to the provider you chose, only when you press Extract. Free OpenRouter models and Gemini's free tier may keep what they receive, so don't send confidential designs.</p>
       </div>
     </section>
 
@@ -324,6 +368,18 @@ body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
   </div>
 </div>
 
+<dialog class="proj-dialog" id="projDialog" aria-labelledby="projDlgTitle">
+  <div class="dlg-head">
+    <h2 id="projDlgTitle">Projects</h2>
+    <input class="in" id="projSearch" type="search" placeholder="Search projects" aria-label="Search projects">
+    <button type="button" class="icon-btn" id="closeDlg" aria-label="Close">×</button>
+  </div>
+  <div class="dlg-body">
+    <p class="hint">Projects are saved in this browser. Use Export to back one up or send it to a teammate, and Import to open one you received.</p>
+    <ul class="proj-list" id="projList"></ul>
+  </div>
+</dialog>
+
 <datalist id="types">
   <option value="integer"><option value="bigint"><option value="serial"><option value="uuid">
   <option value="varchar(255)"><option value="text"><option value="boolean"><option value="numeric(10,2)">
@@ -350,58 +406,98 @@ let format = "ddl";
    AI connection (bring your own key)
    ===================================================================== */
 const DEFAULT_OR_MODELS = "nvidia/nemotron-3.5-super-vl:free, thinkingmachines/inkling:free, google/gemma-4-31b-it:free, openrouter/free";
+const link = (href, text) => `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
 const PROVIDERS = {
-  openrouter: { label: "OpenRouter API key", placeholder: "sk-or-…",
-    hint: 'Free: create a key at <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai/settings/keys</a>. Without $10 of lifetime credit, free models allow 50 requests a day per account; with it, 1,000.' },
-  anthropic: { label: "Claude API key", placeholder: "sk-ant-…",
-    hint: 'Paid, about $0.001 per extraction with Haiku. Create a key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a> and set a monthly spend limit there.' }
+  openrouter: {
+    name: "OpenRouter", keyLabel: "OpenRouter API key", placeholder: "sk-or-…",
+    modelLabel: "Models to try, in order", defaultModel: DEFAULT_OR_MODELS,
+    models: ["nvidia/nemotron-3.5-super-vl:free", "thinkingmachines/inkling:free", "google/gemma-4-31b-it:free", "openrouter/free", "deepseek/deepseek-v4.1-flash"],
+    hint: `Free. Get a key at ${link("https://openrouter.ai/settings/keys", "openrouter.ai")}. Free models allow 50 requests a day per account, or 1,000 after $10 of lifetime credit, and may log what they receive. Free models change often; find current ones that accept images at ${link("https://openrouter.ai/models?q=:free", "openrouter.ai/models")}.`,
+    extract: extractOpenRouter
+  },
+  gemini: {
+    name: "Gemini", keyLabel: "Gemini API key", placeholder: "AIza…",
+    modelLabel: "Model", defaultModel: "gemini-3.1-flash-lite",
+    models: ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-3-flash-preview", "gemini-2.5-flash"],
+    hint: `Free tier with daily limits; Google may use free-tier inputs to improve its products. Paid use is about $0.001–0.003 per extraction. Get a key at ${link("https://aistudio.google.com/apikey", "Google AI Studio")}.`,
+    extract: extractGemini
+  },
+  openai: {
+    name: "ChatGPT", keyLabel: "OpenAI API key", placeholder: "sk-…",
+    modelLabel: "Model", defaultModel: "gpt-6-luna",
+    models: ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol"],
+    hint: `Paid, about $0.001 per extraction with gpt-6-luna. Get a key at ${link("https://platform.openai.com/api-keys", "platform.openai.com")} and set a usage limit there.`,
+    extract: extractOpenAI
+  },
+  anthropic: {
+    name: "Claude", keyLabel: "Claude API key", placeholder: "sk-ant-…",
+    modelLabel: "Model", defaultModel: "claude-haiku-5-5",
+    models: ["claude-haiku-5-5", "claude-sonnet-5-5"],
+    hint: `Paid, about $0.001 per extraction with Haiku. Get a key at ${link("https://platform.claude.com/settings/keys", "platform.claude.com")} and set a monthly spend limit there.`,
+    extract: extractClaude
+  },
+  deepseek: {
+    name: "DeepSeek", keyLabel: "DeepSeek API key", placeholder: "sk-…",
+    modelLabel: "Model", defaultModel: "deepseek-flash",
+    models: ["deepseek-flash"],
+    hint: `Paid, about $0.001–0.002 per extraction. Get a key at ${link("https://platform.deepseek.com/api_keys", "platform.deepseek.com")}. If you see a connection error, DeepSeek may not accept requests from web pages; use OpenRouter with deepseek/deepseek-v4.1-flash instead.`,
+    extract: extractDeepSeek
+  }
 };
-let provider = store.get("s2s.provider") === "anthropic" ? "anthropic" : "openrouter";
-const sessionKeys = { openrouter: "", anthropic: "" };
+let provider = PROVIDERS[store.get("s2s.provider")] ? store.get("s2s.provider") : "openrouter";
+const sessionKeys = {};
 
 function keyFor(p) { return sessionKeys[p] || store.get("s2s.key." + p) || ""; }
+function modelFor(p) {
+  const legacy = p === "openrouter" ? store.get("s2s.orModels") : p === "anthropic" ? store.get("s2s.anModel") : null;
+  return (store.get("s2s.model." + p) || legacy || PROVIDERS[p].defaultModel).trim();
+}
 function renderConn() {
   const P = PROVIDERS[provider];
-  $("#provOR").setAttribute("aria-pressed", provider === "openrouter");
-  $("#provAN").setAttribute("aria-pressed", provider === "anthropic");
-  $("#keyLabel").textContent = P.label;
+  $("#provider").value = provider;
+  $("#keyLabel").textContent = P.keyLabel;
   $("#apiKey").placeholder = P.placeholder;
   $("#apiKey").value = keyFor(provider);
+  $("#modelLabel").textContent = P.modelLabel;
+  $("#model").value = modelFor(provider);
+  $("#model").placeholder = P.defaultModel;
+  $("#modelList").innerHTML = P.models.map((m) => `<option value="${esc(m)}">`).join("");
   $("#provHint").innerHTML = P.hint;
-  $("#orModelsWrap").hidden = provider !== "openrouter";
-  $("#anModelWrap").hidden = provider !== "anthropic";
   updateConnStatus();
 }
 function updateConnStatus() {
   const has = !!keyFor(provider);
+  const m = modelFor(provider);
   $("#connDot").classList.toggle("on", has);
   $("#connText").textContent = has
-    ? (provider === "openrouter" ? "Ready · OpenRouter free models" : "Ready · Claude " + $("#anModel").value.replace("claude-", ""))
+    ? `Ready · ${PROVIDERS[provider].name} · ${provider === "openrouter" ? "free models" : m}`
     : "Add a key to enable Extract";
   $("#extractBtn").disabled = !has;
 }
-function setProvider(p) { provider = p; store.set("s2s.provider", p); renderConn(); }
-$("#provOR").addEventListener("click", () => setProvider("openrouter"));
-$("#provAN").addEventListener("click", () => setProvider("anthropic"));
+$("#provider").addEventListener("change", (e) => { provider = e.target.value; store.set("s2s.provider", provider); renderConn(); });
 $("#apiKey").addEventListener("input", (e) => {
   const v = e.target.value.trim();
   sessionKeys[provider] = v;
   if ($("#remember").checked && v) store.set("s2s.key." + provider, v); else store.del("s2s.key." + provider);
   updateConnStatus();
 });
+$("#model").addEventListener("change", (e) => {
+  const v = e.target.value.trim();
+  if (v && v !== PROVIDERS[provider].defaultModel) store.set("s2s.model." + provider, v); else store.del("s2s.model." + provider);
+  if (!v) e.target.value = PROVIDERS[provider].defaultModel;
+  updateConnStatus();
+});
 $("#remember").addEventListener("change", (e) => {
   store.set("s2s.remember", e.target.checked ? "1" : "0");
-  const v = keyFor(provider);
-  if (e.target.checked && v) store.set("s2s.key." + provider, v); else store.del("s2s.key." + provider);
+  for (const p of Object.keys(PROVIDERS)) {
+    const v = keyFor(p);
+    if (e.target.checked && v) store.set("s2s.key." + p, v); else store.del("s2s.key." + p);
+  }
 });
 $("#forgetKey").addEventListener("click", () => {
   sessionKeys[provider] = ""; store.del("s2s.key." + provider); $("#apiKey").value = ""; updateConnStatus();
-  showMsg("Key removed from this browser.");
+  showMsg(`${PROVIDERS[provider].name} key removed from this browser.`);
 });
-$("#orModels").value = store.get("s2s.orModels") || DEFAULT_OR_MODELS;
-$("#orModels").addEventListener("change", (e) => store.set("s2s.orModels", e.target.value));
-$("#anModel").value = store.get("s2s.anModel") || "claude-haiku-5-5";
-$("#anModel").addEventListener("change", (e) => { store.set("s2s.anModel", e.target.value); updateConnStatus(); });
 $("#remember").checked = store.get("s2s.remember") !== "0";
 
 /* =====================================================================
@@ -704,6 +800,7 @@ $("#copyBtn").addEventListener("click", () => {
 const cv = $("#sketch"), cx = cv.getContext("2d"), board = $("#board");
 let mode = "photo";
 let photoImg = null;          // uploaded photo; null = example whiteboard
+let photoData = null;         // the same photo as a JPEG data URL, for saving in the project
 let photoName = "Example whiteboard (shop schema)";
 
 function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -766,12 +863,15 @@ const ICONS = {
   zoomIn: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6M11 8v6"/>',
   fit: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   meeting: '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>',
-  fullscreen: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'
+  fullscreen: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'
 };
-document.querySelectorAll("[data-icon]").forEach((el) => {
-  const d = ICONS[el.dataset.icon];
-  if (d) el.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`);
-});
+const svgIcon = (name) => ICONS[name] ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name]}</svg>` : "";
+document.querySelectorAll("[data-icon]").forEach((el) => el.insertAdjacentHTML("afterbegin", svgIcon(el.dataset.icon)));
 function setLabel(sel, text) { const l = $(sel)?.querySelector(".lbl"); if (l) l.textContent = text; }
 
 /* ---------- Draw mode ---------- */
@@ -790,10 +890,9 @@ let pan = null, spaceDown = false;
   if (w >= 600 && h >= 400) { boardW = w; boardH = h; }
   const ts = Number(store.get("s2s.textSize")); if ([24, 30, 40].includes(ts)) textSize = ts;
 })();
-try { const saved = JSON.parse(store.get("s2s.drawing") || "[]"); if (Array.isArray(saved)) shapes = saved; } catch {}
 
 function pushHistory() { history.push(JSON.stringify(shapes)); if (history.length > 100) history.shift(); }
-function saveDrawing() { store.set("s2s.drawing", JSON.stringify(shapes)); }
+function saveDrawing() { markDirty(); }
 
 function crowFoot(x, ux, uy, px, py, sf = 1) {
   const bx = px - ux * 24 * sf, by = py - uy * 24 * sf;
@@ -897,7 +996,7 @@ $("#boardSize").addEventListener("change", (e) => {
   boardW = w; boardH = h; store.set("s2s.boardSize", e.target.value);
   const suggested = w >= 2600 ? 40 : w >= 1800 ? 30 : textSize;   // keep text readable at Fit
   if (suggested > textSize) { textSize = suggested; $("#textSize").value = String(textSize); store.set("s2s.textSize", String(textSize)); }
-  zoom = "fit"; drawBoard(); applyZoom(); showMsg("");
+  zoom = "fit"; drawBoard(); applyZoom(); showMsg(""); markDirty();
 });
 $("#textSize").value = String(textSize);
 $("#textSize").addEventListener("change", (e) => { textSize = Number(e.target.value); store.set("s2s.textSize", e.target.value); });
@@ -1070,8 +1169,10 @@ function setMode(m) {
   $("#drawBar").hidden = m !== "draw";
   board.classList.toggle("drawing", m === "draw");
   $("#sourceName").textContent = m === "draw" ? "Your drawing" : photoName;
-  $("#sourceTip").textContent = m === "draw" ? "Saved in this browser as you draw" : "Drop or paste an image here too";
+  $("#sourceTip").textContent = m === "draw" ? "Saved with the project as you draw" : "Drop or paste an image here too";
+  $("#drawHint").hidden = m !== "draw" || shapes.length > 0;
   redraw();
+  markDirty();
 }
 $("#modePhoto").addEventListener("click", () => setMode("photo"));
 $("#modeDraw").addEventListener("click", () => setMode("draw"));
@@ -1084,7 +1185,7 @@ async function takeFile(file) {
   try {
     const img = new Image();
     await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
-    photoImg = img; photoName = file.name || "Pasted image";
+    photoImg = img; photoName = file.name || "Pasted image"; photoData = imageToJpeg(img); markDirty();
     setMode("photo");
     showMsg("Photo ready. Press Extract schema to draft the tables.");
   } catch { showMsg("That image couldn't be opened. Try another file.", true); }
@@ -1098,7 +1199,7 @@ document.addEventListener("paste", (e) => {
   const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
   if (item) { e.preventDefault(); takeFile(item.getAsFile()); }
 });
-$("#useExample").addEventListener("click", () => { photoImg = null; photoName = "Example whiteboard (shop schema)"; setMode("photo"); showMsg(""); });
+$("#useExample").addEventListener("click", () => { photoImg = null; photoData = null; photoName = "Example whiteboard (shop schema)"; setMode("photo"); showMsg(""); markDirty(); });
 
 /* =====================================================================
    Extraction: browser → provider, with the person's own key
@@ -1172,8 +1273,8 @@ async function apiError(res) {
 }
 
 async function extractOpenRouter(key, dataUrl, signal) {
-  const models = ($("#orModels").value || DEFAULT_OR_MODELS).split(",").map((s) => s.trim()).filter(Boolean);
-  let last = "No free model could read the sketch right now. Try again in a minute.";
+  const models = modelFor("openrouter").split(",").map((s) => s.trim()).filter(Boolean);
+  let last = "No model could read the sketch right now. Try again in a minute.";
   for (const model of models) {
     $("#busyText").textContent = `Reading the sketch with ${model}…`;
     let res;
@@ -1192,20 +1293,93 @@ async function extractOpenRouter(key, dataUrl, signal) {
       if (/per-day|per day|daily/i.test(d)) throw new Error("You've used today's free requests on this OpenRouter account. They reset at 00:00 UTC.");
       last = "Free models are busy. Try again in a minute."; continue;
     }
-    if (!res.ok) { last = (await apiError(res)) || `A free model failed (${res.status}).`; continue; }
+    if (!res.ok) { last = (await apiError(res)) || `A model failed (${res.status}).`; continue; }
     const msg = await res.json();
-    if (msg.error) { last = msg.error.message || "A free model failed to answer."; continue; }
+    if (msg.error) { last = msg.error.message || "A model failed to answer."; continue; }
     const choice = msg.choices?.[0];
     if (choice?.finish_reason === "length") { last = "The diagram was too large for one pass. Crop it into parts."; continue; }
     const parsed = parseJson(choice?.message?.content || "");
     if (validShape(parsed)) return { result: parsed, model: msg.model || model };
-    last = "A free model's reply couldn't be read. Try again.";
+    last = "A model's reply couldn't be read. Try again.";
   }
   throw new Error(last);
 }
 
+// Shared by OpenAI and DeepSeek (both use the Chat Completions format).
+async function chatCompletion({ url, key, model, dataUrl, signal, label, extra, unreachable }) {
+  $("#busyText").textContent = `Reading the sketch with ${model}…`;
+  const send = (body) => fetch(url, {
+    method: "POST", signal,
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: dataUrl } }] }], ...body })
+  });
+  let res;
+  try {
+    res = await send(extra);
+    // Some models reject JSON mode together with images; retry once without it.
+    if (res.status === 400 && extra.response_format) {
+      const detail = await apiError(res.clone());
+      if (/response_format|json/i.test(detail)) { const { response_format, ...rest } = extra; res = await send(rest); }
+    }
+  } catch (e) { if (e?.name === "AbortError") throw e; throw new Error(unreachable || `Couldn't reach ${label}. Check your connection.`); }
+  if (res.status === 401) throw new Error(`${label} rejected the key. Check it under AI connection.`);
+  if (res.status === 402) throw new Error(`Your ${label} account has no balance left. Add credit, then try again.`);
+  if (res.status === 404) throw new Error(`${label} doesn't recognize the model "${model}". Pick another under AI connection → Model.`);
+  if (res.status === 429) throw new Error(`${label} rate limit or quota reached. Wait a minute, or check your plan's limits.`);
+  if (!res.ok) throw new Error((await apiError(res)) || `${label} returned an error (${res.status}).`);
+  const msg = await res.json();
+  const choice = msg.choices?.[0];
+  if (choice?.finish_reason === "length") throw new Error("The diagram was too large for one pass. Crop it into parts.");
+  if (choice?.message?.refusal) throw new Error(`${label} declined to read this image. Try a different sketch.`);
+  const content = choice?.message?.content;
+  const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((c) => c?.text || "").join("") : "";
+  const parsed = parseJson(text);
+  if (!validShape(parsed)) throw new Error("The reply couldn't be read. Try again, or pick a stronger model.");
+  return { result: parsed, model: msg.model || model };
+}
+
+function extractOpenAI(key, dataUrl, signal) {
+  return chatCompletion({ url: "https://api.openai.com/v1/chat/completions", key, model: modelFor("openai"), dataUrl, signal, label: "OpenAI",
+    extra: { max_completion_tokens: 6000, response_format: { type: "json_object" } } });
+}
+function extractDeepSeek(key, dataUrl, signal) {
+  return chatCompletion({ url: "https://api.deepseek.com/chat/completions", key, model: modelFor("deepseek"), dataUrl, signal, label: "DeepSeek",
+    extra: { max_tokens: 4000, temperature: 0, response_format: { type: "json_object" } },
+    unreachable: "Couldn't reach DeepSeek. It may not accept requests from web pages; use OpenRouter with deepseek/deepseek-v4.1-flash instead." });
+}
+
+async function extractGemini(key, dataUrl, signal) {
+  const model = modelFor("gemini");
+  $("#busyText").textContent = `Reading the sketch with ${model}…`;
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: PROMPT }, { inline_data: { mime_type: "image/jpeg", data: dataUrl.split(",")[1] } }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 8192 }
+      })
+    });
+  } catch (e) { if (e?.name === "AbortError") throw e; throw new Error("Couldn't reach Gemini. Check your connection."); }
+  if (!res.ok) {
+    const d = await apiError(res);
+    if (/api key/i.test(d) || res.status === 401 || res.status === 403) throw new Error("Gemini rejected the key. Check it under AI connection.");
+    if (res.status === 404) throw new Error(`Gemini doesn't recognize the model "${model}". Pick another under AI connection → Model.`);
+    if (res.status === 429) throw new Error("Gemini quota reached (free-tier limits are per day and per minute). Wait, or use another provider.");
+    throw new Error(d || `Gemini returned an error (${res.status}).`);
+  }
+  const msg = await res.json();
+  if (msg.promptFeedback?.blockReason) throw new Error("Gemini declined to read this image. Try a different sketch.");
+  const cand = msg.candidates?.[0];
+  if (cand?.finishReason === "MAX_TOKENS") throw new Error("The diagram was too large for one pass. Crop it into parts.");
+  const parsed = parseJson((cand?.content?.parts || []).map((p) => p.text || "").join(""));
+  if (!validShape(parsed)) throw new Error("The reply couldn't be read. Try again, or pick a stronger model.");
+  return { result: parsed, model: msg.modelVersion || model };
+}
+
 async function extractClaude(key, dataUrl, signal) {
-  const model = $("#anModel").value;
+  const model = modelFor("anthropic");
   $("#busyText").textContent = `Reading the sketch with ${model}…`;
   const [meta, data] = dataUrl.split(",");
   const media = meta.match(/data:(.*?);/)[1];
@@ -1248,13 +1422,13 @@ $("#extractBtn").addEventListener("click", async () => {
   $("#busy").hidden = false; $("#busyText").textContent = "Reading the sketch…"; $("#extractBtn").disabled = true; showMsg("");
   try {
     const dataUrl = prepareImage();
-    const out = provider === "anthropic" ? await extractClaude(key, dataUrl, ctl.signal) : await extractOpenRouter(key, dataUrl, ctl.signal);
+    const out = await PROVIDERS[provider].extract(key, dataUrl, ctl.signal);
     const next = fromModel(fromCompact(out.result));
     if (!next.tables.length) {
       showMsg(next.warnings[0] ? `No tables found. ${next.warnings[0]}` : "No tables found. Try a clearer sketch.", true);
       return;
     }
-    schema = next; snapshot(); render();
+    schema = next; snapshot(); render(); markDirty();
     const n = schema.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
     showMsg(`Drafted ${schema.tables.length} tables with ${out.model}. ${n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over."}${inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""}`);
   } catch (e) {
@@ -1267,12 +1441,296 @@ $("#extractBtn").addEventListener("click", async () => {
 $("#stopBtn").addEventListener("click", () => ctl?.abort());
 
 /* =====================================================================
+   Projects: saved in this browser (IndexedDB) and autosaved
+   ===================================================================== */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((ok, bad) => {
+      if (!("indexedDB" in window)) { bad(new Error("unavailable")); return; }
+      const r = indexedDB.open("sketch-to-schema", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("projects", { keyPath: "id" });
+      r.onsuccess = () => { this.db = r.result; ok(); };
+      r.onerror = () => bad(r.error);
+      r.onblocked = () => bad(new Error("blocked"));
+    });
+  },
+  tx(mode, fn) {
+    return new Promise((ok, bad) => {
+      const t = this.db.transaction("projects", mode);
+      const req = fn(t.objectStore("projects"));
+      t.oncomplete = () => ok(req?.result);
+      t.onerror = () => bad(t.error);
+      t.onabort = () => bad(t.error);
+    });
+  },
+  all() { return this.tx("readonly", (st) => st.getAll()); },
+  put(p) { return this.tx("readwrite", (st) => st.put(p)); },
+  del(id) { return this.tx("readwrite", (st) => st.delete(id)); }
+};
+let current = null, projectLoading = false, saveTimer = null, dbReady = false;
+const newId = () => "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const dlg = $("#projDialog");
+
+function relTime(ts) {
+  const d = (Date.now() - ts) / 1000;
+  if (d < 60) return "just now";
+  if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)} h ago`;
+  if (d < 7 * 86400) return `${Math.floor(d / 86400)} d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+function setSaveState(state, detail) {
+  const el = $("#saveState");
+  el.classList.toggle("err", state === "error");
+  el.textContent = state === "saving" ? "Saving…"
+    : state === "saved" ? `Saved · ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : state === "error" ? detail : "";
+}
+function imageToJpeg(img, maxEdge = 1600) {
+  const sc = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+function makeThumb() {
+  const w = 240, h = Math.max(1, Math.round((w * cv.height) / cv.width));
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(cv, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", 0.7);
+}
+const loadImage = (src) => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; });
+
+// Imported files are untrusted: keep only well-formed shapes and draft fields.
+const num = (v) => typeof v === "number" && isFinite(v);
+function cleanShapes(list) {
+  return (Array.isArray(list) ? list : []).filter((s) => s && (
+    (s.type === "pen" && Array.isArray(s.pts) && s.pts.every((pt) => Array.isArray(pt) && num(pt[0]) && num(pt[1]))) ||
+    (["box", "line", "many"].includes(s.type) && [s.x1, s.y1, s.x2, s.y2].every(num)) ||
+    (s.type === "text" && typeof s.text === "string" && num(s.x) && num(s.y))
+  )).map((s) => s.type === "text" ? { ...s, size: [24, 30, 40].includes(s.size) ? s.size : 30 } : s);
+}
+function cleanDraft(tables) {
+  return (Array.isArray(tables) ? tables : []).map((t) => ({
+    id: String(t?.id || uid()), name: String(t?.name ?? ""), flags: normFlags(t?.flags),
+    columns: (Array.isArray(t?.columns) ? t.columns : []).map((c) => ({
+      id: String(c?.id || uid()), name: String(c?.name ?? ""), type: String(c?.type ?? ""),
+      typeGuessed: !!c?.typeGuessed, pk: !!c?.pk, nullable: !!c?.nullable, unique: !!c?.unique,
+      ref: c?.ref && typeof c.ref.t === "string" && typeof c.ref.c === "string" ? { t: c.ref.t, c: c.ref.c } : null,
+      refName: c?.refName ? String(c.refName) : null, flags: normFlags(c?.flags)
+    }))
+  }));
+}
+
+function snapshotProject() {
+  return {
+    ...current, name: $("#projName").value.trim() || "Untitled project", updatedAt: Date.now(),
+    mode, photo: photoData, photoName: photoData ? photoName : null,
+    drawing: { shapes, boardW, boardH },
+    draft: { tables: schema.tables, warnings: schema.warnings }, original,
+    tableCount: schema.tables.length, thumb: makeThumb()
+  };
+}
+function markDirty() {
+  if (projectLoading || !current) return;
+  if (!dbReady) return;
+  setSaveState("saving");
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700);
+}
+async function saveNow() {
+  clearTimeout(saveTimer); saveTimer = null;
+  if (!current || !dbReady) return;
+  try { const snap = snapshotProject(); await DB.put(snap); current = snap; setSaveState("saved"); }
+  catch (e) {
+    setSaveState("error", /quota/i.test(String(e?.name || e)) ? "Not saved: browser storage is full. Export and delete old projects." : "Not saved: this browser blocked storage.");
+  }
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden && saveTimer) saveNow(); });
+addEventListener("pagehide", () => { if (saveTimer) saveNow(); });
+
+function blankProject(name) {
+  const now = Date.now();
+  return { id: newId(), name, createdAt: now, updatedAt: now, mode: "draw", photo: null, photoName: null,
+    drawing: { shapes: [], boardW, boardH }, draft: { tables: [], warnings: [] }, original: {}, tableCount: 0, thumb: null };
+}
+async function uniqueName(base) {
+  const names = new Set(dbReady ? (await DB.all()).map((x) => x.name) : []);
+  if (!names.has(base)) return base;
+  for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`;
+}
+async function loadProject(p) {
+  closeTextInput(true);
+  projectLoading = true;
+  try {
+    current = p;
+    $("#projName").value = p.name || "Untitled project";
+    shapes = cleanShapes(p.drawing?.shapes);
+    history = [];
+    if (num(p.drawing?.boardW) && num(p.drawing?.boardH) && p.drawing.boardW >= 600 && p.drawing.boardH >= 400) { boardW = p.drawing.boardW; boardH = p.drawing.boardH; }
+    $("#boardSize").value = `${boardW}x${boardH}`;
+    if ($("#boardSize").value !== `${boardW}x${boardH}`) { boardW = 1200; boardH = 760; $("#boardSize").value = "1200x760"; }
+    photoData = typeof p.photo === "string" && /^data:image\/(jpeg|png|webp|gif);base64,/.test(p.photo) ? p.photo : null;
+    photoImg = photoData ? await loadImage(photoData).catch(() => null) : null;
+    if (!photoImg) photoData = null;
+    photoName = photoImg ? (p.photoName || "Saved photo") : "Example whiteboard (shop schema)";
+    schema = { tables: cleanDraft(p.draft?.tables), warnings: (Array.isArray(p.draft?.warnings) ? p.draft.warnings : []).map(String) };
+    original = p.original && typeof p.original === "object" ? p.original : {};
+    render();
+    zoom = "fit";
+    setMode(p.mode === "draw" ? "draw" : "photo");
+    showMsg("");
+    store.set("s2s.currentProject", p.id);
+    setSaveState(dbReady ? "saved" : "");
+  } finally { projectLoading = false; }
+}
+
+// Edits anywhere on the page mark the project for saving.
+$("#tables").addEventListener("input", markDirty);
+$("#tables").addEventListener("click", (e) => { if (e.target.closest("button")) markDirty(); });
+$("#addTable").addEventListener("click", markDirty);
+$("#projName").addEventListener("input", markDirty);
+
+$("#newProj").addEventListener("click", async () => {
+  await saveNow();
+  const np = blankProject(await uniqueName("Untitled project"));
+  if (dbReady) await DB.put(np).catch(() => {});
+  await loadProject(np);
+  showMsg("New project. Draw the schema here, or switch to Photo to upload one.");
+  $("#projName").focus(); $("#projName").select();
+});
+
+function slug(t) { return (t || "project").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project"; }
+function exportProject(proj) {
+  const { thumb, ...rest } = proj;
+  const blob = new Blob([JSON.stringify({ format: "sketch-to-schema", version: 1, exportedAt: new Date().toISOString(), project: rest })], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `${slug(proj.name)}.s2s.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$("#exportProj").addEventListener("click", async () => {
+  if (!current) return;
+  await saveNow();
+  exportProject(snapshotProject());
+  showMsg(`Exported "${$("#projName").value.trim() || "Untitled project"}" as a file. Import it on another browser to continue there.`);
+});
+
+$("#importFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  let data;
+  try { data = JSON.parse(await f.text()); } catch { data = null; }
+  const ip = data?.project;
+  if (data?.format !== "sketch-to-schema" || !ip || typeof ip !== "object") { showMsg("That file isn't a Sketch to Schema project export.", true); return; }
+  await saveNow();
+  const now = Date.now();
+  const np = { ...blankProject(await uniqueName(String(ip.name || "Imported project").slice(0, 120))),
+    mode: ip.mode === "draw" ? "draw" : "photo", photo: ip.photo, photoName: ip.photoName ? String(ip.photoName) : null,
+    drawing: { shapes: cleanShapes(ip.drawing?.shapes), boardW: ip.drawing?.boardW, boardH: ip.drawing?.boardH },
+    draft: { tables: cleanDraft(ip.draft?.tables), warnings: (Array.isArray(ip.draft?.warnings) ? ip.draft.warnings : []).map(String) },
+    original: ip.original && typeof ip.original === "object" ? ip.original : {}, createdAt: now, updatedAt: now };
+  await loadProject(np);
+  if (dbReady) await saveNow();
+  if (dlg.open) renderProjectList();
+  showMsg(`Imported "${np.name}".`);
+});
+
+async function renderProjectList() {
+  const q = $("#projSearch").value.trim().toLowerCase();
+  let list = dbReady ? await DB.all() : (current ? [snapshotProject()] : []);
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  if (q) list = list.filter((x) => String(x.name || "").toLowerCase().includes(q));
+  $("#projList").innerHTML = list.length ? list.map((x) => {
+    const isCur = x.id === current?.id;
+    const n = x.tableCount ?? x.draft?.tables?.length ?? 0;
+    const thumb = typeof x.thumb === "string" && x.thumb.startsWith("data:image/jpeg;base64,") ? x.thumb : "";
+    return `<li class="proj-item${isCur ? " current" : ""}" data-id="${esc(x.id)}">
+      ${thumb ? `<img class="proj-thumb" src="${esc(thumb)}" alt="">` : `<div class="proj-thumb" aria-hidden="true"></div>`}
+      <div class="proj-meta"><b>${esc(x.name || "Untitled project")}</b><span>${n} table${n === 1 ? "" : "s"} · edited ${relTime(x.updatedAt)}${isCur ? " · open now" : ""}</span></div>
+      <div class="proj-actions">
+        ${isCur ? "" : `<button type="button" class="primary" data-act="open">${svgIcon("folder")}Open</button>`}
+        <button type="button" data-act="dup">${svgIcon("copy")}Duplicate</button>
+        <button type="button" data-act="export">${svgIcon("download")}Export</button>
+        <button type="button" class="danger" data-act="del">${svgIcon("trash")}<span>Delete</span></button>
+      </div></li>`;
+  }).join("") : `<li class="empty">${q ? "No projects match that search." : "No saved projects yet."}</li>`;
+}
+$("#openProj").addEventListener("click", async () => {
+  await saveNow();
+  $("#projSearch").value = "";
+  await renderProjectList();
+  dlg.showModal();
+});
+$("#closeDlg").addEventListener("click", () => dlg.close());
+dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+$("#projSearch").addEventListener("input", renderProjectList);
+$("#projList").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b || !dbReady) return;
+  const id = b.closest("[data-id]").dataset.id;
+  const proj = (await DB.all()).find((x) => x.id === id);
+  if (!proj) return;
+  const act = b.dataset.act;
+  if (act === "open") { await saveNow(); await loadProject(proj); dlg.close(); }
+  else if (act === "dup") {
+    const now = Date.now();
+    await DB.put({ ...proj, id: newId(), name: await uniqueName(`${proj.name} (copy)`), createdAt: now, updatedAt: now });
+    renderProjectList();
+  } else if (act === "export") {
+    if (id === current?.id) { await saveNow(); exportProject(snapshotProject()); } else exportProject(proj);
+  } else if (act === "del") {
+    const label = b.querySelector("span");
+    if (b.dataset.armed !== "1") {
+      b.dataset.armed = "1"; label.textContent = "Click again to delete";
+      setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; label.textContent = "Delete"; } }, 3000);
+      return;
+    }
+    if (id === current?.id) { clearTimeout(saveTimer); saveTimer = null; current = null; }
+    await DB.del(id);
+    if (!current) {
+      const rest = (await DB.all()).sort((a, c) => c.updatedAt - a.updatedAt);
+      if (rest.length) await loadProject(rest[0]);
+      else { const np = blankProject("Untitled project"); await DB.put(np); await loadProject(np); }
+    }
+    renderProjectList();
+  }
+});
+
+async function initProjects() {
+  try { await DB.open(); dbReady = true; } catch { dbReady = false; }
+  if (!dbReady) {
+    const ex = fromModel(EXAMPLE);
+    await loadProject({ ...blankProject("Shop schema (example)"), mode: "photo", draft: ex });
+    snapshot(); updateSummary();
+    setSaveState("error", "Projects can't be saved in this browser (private window?). Use Export to keep your work.");
+    return;
+  }
+  let list = await DB.all();
+  let created = false;
+  if (!list.length) {
+    // First run: start with the example, keeping any drawing from the earlier version of this page.
+    let legacy = [];
+    try { legacy = JSON.parse(store.get("s2s.drawing") || "[]"); } catch {}
+    const ex = fromModel(EXAMPLE);
+    const first = { ...blankProject("Shop schema (example)"), mode: "photo", drawing: { shapes: cleanShapes(legacy), boardW, boardH }, draft: ex, tableCount: ex.tables.length };
+    await DB.put(first);
+    store.del("s2s.drawing");
+    list = [first]; created = true;
+  }
+  const last = store.get("s2s.currentProject");
+  const pick = list.find((x) => x.id === last) || list.sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  await loadProject(pick);
+  if (created) { snapshot(); updateSummary(); }
+  if (created || !pick.thumb) markDirty();
+}
+
+/* =====================================================================
    Boot
    ===================================================================== */
-schema = fromModel(EXAMPLE); snapshot(); render();
 renderConn();
-setMode("photo");
-document.fonts?.ready?.then(() => redraw());
+initProjects().then(() => document.fonts?.ready?.then(() => redraw()));
 </script>
 </body>
 </html>

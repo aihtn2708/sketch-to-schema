@@ -2,7 +2,7 @@
 
 Turn a whiteboard photo, or a diagram drawn on screen, into a draft database schema, review it, and copy PostgreSQL DDL or DBML.
 
-It's a single static page (`index.html`). There's no server: each person adds their own API key, which stays in their browser and is sent only to the provider they pick.
+It's a single static page (`index.html`). There's no server: each person adds their own API key (OpenRouter, Gemini, ChatGPT, Claude or DeepSeek), which stays in their browser and is sent only to the provider they pick. Work is saved as projects in the browser.
 
 ## Deploy on GitHub Pages (about 5 minutes)
 
@@ -25,24 +25,33 @@ To update it later, replace `index.html` and commit; Pages redeploys automatical
 
 ## Each teammate: add a key (once per browser)
 
-Open the site and fill in **AI connection**.
+Open the site, pick a provider under **AI connection**, and paste a key. Keys stay in that browser and are sent only to the provider you pick. The **Model** box suggests models and accepts any model name the provider supports.
 
-| Provider | Cost | Where to get a key |
-|---|---|---|
-| **OpenRouter (free models)** | $0 | https://openrouter.ai/settings/keys |
-| **Claude API** | ~$0.001 per extraction with Haiku | https://platform.claude.com/settings/keys |
+| Provider | Cost per extraction | Default model | Where to get a key |
+|---|---|---|---|
+| **OpenRouter (free models)** | $0 | a list of free vision models, tried in order | https://openrouter.ai/settings/keys |
+| **Gemini (Google)** | free tier, or ~$0.001–0.003 | `gemini-3.1-flash-lite` | https://aistudio.google.com/apikey |
+| **ChatGPT (OpenAI)** | ~$0.001 | `gpt-6-luna` | https://platform.openai.com/api-keys |
+| **Claude (Anthropic)** | ~$0.001 | `claude-haiku-5-5` | https://platform.claude.com/settings/keys |
+| **DeepSeek** | ~$0.001–0.002 | `deepseek-flash` | https://platform.deepseek.com/api_keys |
 
-OpenRouter notes:
-- Free models allow **50 requests a day per account**, or **1,000 a day** once that account has bought $10 of credit (free models don't spend it). 20 requests a minute either way. Limits reset at 00:00 UTC.
-- In OpenRouter **Settings → Privacy**, check the setting for free models whose providers may train on inputs. If it's off, fewer free vision models are available.
-- Free models may log what they receive. Don't send confidential designs.
-- Free models change often. If extraction keeps failing, open **Model settings** on the page and replace the model list with current free models that accept images: https://openrouter.ai/models?q=:free (filter Input → Image). `openrouter/free` at the end picks any free model that can read images.
+Notes:
+- **OpenRouter:** free models allow 50 requests a day per account, or 1,000 a day once that account has bought $10 of credit (free models don't spend it). Free models change often; if extraction keeps failing, replace the model list with current free models that accept images: https://openrouter.ai/models?q=:free (filter Input → Image).
+- **Free tiers keep data:** free OpenRouter models may log what they receive, and Google may use Gemini free-tier inputs to improve its products. Don't send confidential designs on free tiers.
+- **DeepSeek:** if you get a connection error, DeepSeek may not accept requests from web pages. Use OpenRouter with the model `deepseek/deepseek-v4.1-flash` instead.
+- **Paid providers:** set a monthly spend or usage limit in each provider's console.
+- **Remember on this device** keeps keys in the browser's local storage. Untick it on shared computers, and use **Forget key** when you're done.
 
-Claude API notes:
-- Set a monthly spend limit in the Claude Console.
-- The page calls the API directly from the browser (`anthropic-dangerous-direct-browser-access`), which is safe here because each person uses their own key on their own device.
+## Projects
 
-**Remember on this device** keeps the key in the browser's local storage. Untick it on shared computers, and use **Forget key** when you're done.
+Everything on the page (the photo or drawing, board settings and the draft schema) is saved as a **project** in your browser, automatically as you work.
+
+- **New** starts a blank project. Rename it in the box at the top.
+- **Projects** lists your projects with a preview: open, duplicate, export or delete them, and search by name.
+- **Export** saves the project as a `.s2s.json` file. Send it to a teammate, or keep it as a backup.
+- **Import** opens a project file someone exported. It's added to your list as a new project.
+
+Projects live in this browser only. Clearing site data, or a private window, removes them, so export anything you want to keep.
 
 ## Using it
 
@@ -53,7 +62,7 @@ Claude API notes:
   - **Pen** (P): underline primary keys, or draw freehand.
   - **1 → many** (M): drag from the "one" table to the "many" table; it draws a bar and a crow's foot.
   - **Line** (L), **Eraser** (E), **Undo** (Ctrl/⌘+Z), **Clear**.
-  - The drawing is saved in your browser as you go.
+  - The drawing is saved with the project as you go.
 - **During a meeting:**
   - **Board:** Standard, Wide or Large drawing space. Bigger boards raise the text size so it stays readable.
   - **Text:** Small, Medium or Large for new text.
