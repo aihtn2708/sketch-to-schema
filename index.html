@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sketch to Schema</title>
+<meta name="description" content="Turn a photo or an on-screen sketch of an ER diagram into PostgreSQL DDL or DBML.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Kalam:wght@400;700&display=swap">
+<style>
+/* Layout: settings strip on top, then a two-panel workbench — sketch + export left, editable draft right; stacks on phones. */
+:root {
+  --bg: #eef2f0; --surface: #ffffff; --sunk: #f5f8f6; --ink: #16201d; --muted: #586a64; --line: #d3dcd8;
+  --accent: #0d6e66; --accent-ink: #ffffff; --accent-soft: #dcefeb;
+  --check: #9a4f06; --check-bg: #fbf0df; --check-line: #e8c48f; --danger: #a3261b;
+  --font-ui: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 8px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1513; --surface: #161f1c; --sunk: #111917; --ink: #e2eae7; --muted: #94a59f;
+    --line: #2b3834; --accent: #46c2b2; --accent-ink: #062520; --accent-soft: #163a35;
+    --check: #f1aa55; --check-bg: #2c2217; --check-line: #5e4526; --danger: #f08a7e;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+h1 { font-size: clamp(26px, 3.2vw, 34px); line-height: 1.1; margin: 0; letter-spacing: -0.01em; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+a { color: var(--accent); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.panel-body { padding: 16px 18px; display: grid; gap: 14px; }
+
+/* AI connection */
+.conn { display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; }
+@media (max-width: 760px) { .conn { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > span { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.conn-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--check); flex: none; }
+.dot.on { background: var(--accent); }
+details.more summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+details.more[open] summary { margin-bottom: 8px; }
+
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "sketch draft" "out draft"; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch" "draft" "out"; } }
+#sketchPanel { grid-area: sketch; } #draftPanel { grid-area: draft; } #outPanel { grid-area: out; }
+
+.seg { display: inline-flex; gap: 2px; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 3px; }
+.seg button { border: 0; background: transparent; padding: 5px 12px; font-size: 13px; color: var(--muted); }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tool { padding: 6px 10px; font-size: 13px; }
+.tool[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
+.toolbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+
+.board { position: relative; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: #f7f8f6; }
+.board canvas { display: block; width: 100%; height: auto; }
+.board.drawing canvas { touch-action: none; cursor: crosshair; }
+.board.drawing.t-eraser canvas { cursor: cell; }
+.board.drawing.t-text canvas { cursor: text; }
+.board.drag { outline: 2px dashed var(--accent); outline-offset: -6px; }
+.board-hint { position: absolute; inset: auto 12px 12px 12px; font-size: 13px; color: #586a64; pointer-events: none; text-align: center; }
+.text-input { position: absolute; font-family: Kalam, "Comic Sans MS", cursive; border: 1px dashed #0d6e66; background: rgb(255 255 255 / .9); color: #1f2328; padding: 0 4px; outline: none; min-width: 120px; }
+.busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(2px); }
+.busy-card { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 16px 20px; }
+.scan { width: 140px; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; position: relative; }
+.scan::after { content: ""; position: absolute; inset: 0; width: 40%; background: var(--accent); border-radius: 3px; animation: scan 1.4s ease-in-out infinite; }
+@keyframes scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .scan::after { animation: none; width: 100%; opacity: .5; } }
+.source { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.source strong { color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.msg { font-size: 13.5px; margin: 0; padding: 9px 12px; border-radius: var(--r); background: var(--sunk); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.msg.err { color: var(--danger); }
+
+button, .btn { font: inherit; font-size: 14px; font-weight: 500; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; line-height: 1.2; }
+button:hover, .btn:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.primary:hover { filter: brightness(1.06); }
+button:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+button.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 8px; }
+button.quiet:hover { color: var(--ink); background: var(--sunk); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; color: var(--muted); cursor: pointer; }
+
+.summary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pill { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--sunk); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill.check { background: var(--check-bg); border-color: var(--check-line); color: var(--check); }
+.pill.ok { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+
+.warnings { margin: 0; padding: 10px 14px 10px 30px; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); font-size: 13.5px; color: var(--muted); display: grid; gap: 4px; }
+.tbl { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tbl-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--sunk); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tbl-head .in-tname { font-family: var(--font-code); font-weight: 500; font-size: 15px; flex: 1 1 160px; min-width: 0; }
+.tbl-meta { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col-head, .col { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.1fr) auto minmax(0, 1.3fr) 32px; gap: 8px; align-items: center; padding: 8px 12px; }
+.col-head { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding-block: 8px 2px; }
+.col + .col, .notes + .col { border-top: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .col-head { display: none; }
+  .col { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px; grid-template-areas: "name type del" "tog tog tog" "ref ref ref"; }
+  .col > .in-name { grid-area: name; } .col > .type-wrap { grid-area: type; } .col > .toggles { grid-area: tog; } .col > .in-ref { grid-area: ref; } .col > .del-col { grid-area: del; }
+}
+.in { font: inherit; font-size: 14px; width: 100%; min-width: 0; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.in:hover { border-color: var(--muted); }
+.in-name, .in-type, .in-ref, .in-key { font-family: var(--font-code); font-size: 13.5px; }
+.type-wrap { position: relative; min-width: 0; }
+.in-type.guessed { border-style: dashed; color: var(--muted); padding-right: 52px; }
+.guess-tag { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); pointer-events: none; font-weight: 600; }
+.is-flagged { border-color: var(--check-line) !important; background: var(--check-bg) !important; }
+.toggles { display: flex; gap: 4px; }
+.tg { position: relative; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); cursor: pointer; user-select: none; background: var(--surface); }
+.tg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.tg:has(input:checked) { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.tg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.icon-btn { width: 32px; height: 32px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--muted); font-size: 18px; }
+.icon-btn:hover { color: var(--danger); background: var(--sunk); }
+.notes { display: grid; gap: 6px; padding: 0 12px 10px; }
+.note { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 6px 10px; border-radius: 6px; background: var(--check-bg); color: var(--ink); border: 1px solid var(--check-line); }
+.note .nf { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--check); }
+.note .nt { flex: 1 1 200px; min-width: 0; }
+.note button { font-size: 12.5px; padding: 3px 9px; }
+.tbl-foot { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+.empty { text-align: center; color: var(--muted); padding: 28px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+pre.code { margin: 0; font-family: var(--font-code); font-size: 12.5px; line-height: 1.6; background: var(--sunk); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; overflow: auto; max-height: 460px; white-space: pre; tab-size: 2; }
+.copied { font-size: 12.5px; color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sketch to Schema</h1>
+    <p class="lede">Upload a photo of a whiteboard ER diagram, or draw one here. An AI model drafts the tables; you check anything it marked, then copy PostgreSQL DDL or DBML.</p>
+  </header>
+
+  <!-- AI connection: each person uses their own key, kept in this browser -->
+  <section class="panel" aria-labelledby="connTitle">
+    <div class="panel-head">
+      <h2 id="connTitle">AI connection</h2>
+      <div class="conn-status"><span class="dot" id="connDot"></span><span id="connText" class="hint">No key yet</span></div>
+    </div>
+    <div class="panel-body">
+      <div class="conn">
+        <div class="field">
+          <span>Provider</span>
+          <div class="seg" role="group" aria-label="Provider">
+            <button type="button" id="provOR" aria-pressed="true">OpenRouter (free models)</button>
+            <button type="button" id="provAN" aria-pressed="false">Claude API</button>
+          </div>
+        </div>
+        <label class="field" for="apiKey">
+          <span id="keyLabel">OpenRouter API key</span>
+          <input class="in in-key" id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…">
+        </label>
+        <div class="actions">
+          <label class="check"><input type="checkbox" id="remember" checked> Remember on this device</label>
+          <button type="button" class="quiet" id="forgetKey">Forget key</button>
+        </div>
+      </div>
+      <p class="hint" id="provHint"></p>
+      <details class="more">
+        <summary>Model settings</summary>
+        <div class="field" id="orModelsWrap">
+          <label for="orModels"><span class="hint">OpenRouter models to try, in order (comma-separated). Free models change often; find current ones at <a href="https://openrouter.ai/models?q=:free" target="_blank" rel="noopener">openrouter.ai/models</a> with Input → Image.</span></label>
+          <input class="in in-key" id="orModels" spellcheck="false">
+        </div>
+        <div class="field" id="anModelWrap" hidden>
+          <label for="anModel"><span class="hint">Claude model. Haiku is the cheapest (about $0.001 per extraction).</span></label>
+          <select class="in in-key" id="anModel">
+            <option value="claude-haiku-5-5">claude-haiku-5-5 (cheapest)</option>
+            <option value="claude-sonnet-5-5">claude-sonnet-5-5 (stronger reading)</option>
+          </select>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel" id="sketchPanel" aria-labelledby="sketchTitle">
+      <div class="panel-head">
+        <h2 id="sketchTitle">Sketch</h2>
+        <div class="seg" role="tablist" aria-label="Sketch source">
+          <button type="button" role="tab" id="modePhoto" aria-selected="true">Photo</button>
+          <button type="button" role="tab" id="modeDraw" aria-selected="false">Draw</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="actions" id="photoBar">
+          <label class="btn" for="fileInput">Upload photo</label>
+          <input class="file-input" type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif">
+          <button class="quiet" id="useExample" type="button">Use example</button>
+        </div>
+        <div class="toolbar" id="drawBar" hidden role="toolbar" aria-label="Drawing tools">
+          <button type="button" class="tool" data-tool="box" aria-pressed="true" title="Drag to draw a table box (B)">Box</button>
+          <button type="button" class="tool" data-tool="text" aria-pressed="false" title="Click to type a name (T)">Text</button>
+          <button type="button" class="tool" data-tool="line" aria-pressed="false" title="Drag to connect (L)">Line</button>
+          <button type="button" class="tool" data-tool="many" aria-pressed="false" title="Drag from the 'one' side to the 'many' side (M)">1 → many</button>
+          <button type="button" class="tool" data-tool="pen" aria-pressed="false" title="Freehand (P)">Pen</button>
+          <button type="button" class="tool" data-tool="eraser" aria-pressed="false" title="Click or drag over a shape to remove it (E)">Eraser</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button type="button" class="tool" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+          <button type="button" class="tool" id="clearBtn">Clear</button>
+        </div>
+        <div class="board" id="board">
+          <canvas id="sketch" width="1200" height="760" aria-label="The sketch being read"></canvas>
+          <p class="board-hint" id="drawHint" hidden>Draw a box for each table, type its name and columns inside with Text (underline a key with Pen), then link tables with “1 → many”.</p>
+          <div class="busy" id="busy" hidden>
+            <div class="busy-card">
+              <div class="scan" aria-hidden="true"></div>
+              <div id="busyText" role="status">Reading the sketch…</div>
+              <button type="button" id="stopBtn">Stop</button>
+            </div>
+          </div>
+        </div>
+        <div class="source">
+          <span>Showing: <strong id="sourceName">Example whiteboard (shop schema)</strong></span>
+          <span id="sourceTip">Drop or paste an image here too</span>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" id="extractBtn">Extract schema</button>
+        </div>
+        <p class="msg" id="msg" hidden></p>
+        <p class="hint">The sketch is sent straight from your browser to the provider you chose, only when you press Extract. Free OpenRouter models may log what they receive, so don't send confidential designs.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="draftPanel" aria-labelledby="draftTitle">
+      <div class="panel-head">
+        <h2 id="draftTitle">Draft schema</h2>
+        <div class="summary" id="summary"></div>
+      </div>
+      <div class="panel-body">
+        <ul class="warnings" id="warnings" hidden></ul>
+        <div id="tables" style="display:grid;gap:14px"></div>
+        <div><button type="button" id="addTable">Add table</button></div>
+      </div>
+    </section>
+
+    <section class="panel" id="outPanel" aria-labelledby="outTitle">
+      <div class="panel-head">
+        <h2 id="outTitle">Export</h2>
+        <div class="seg" role="tablist" aria-label="Output format">
+          <button type="button" role="tab" id="tabDdl" aria-selected="true">PostgreSQL DDL</button>
+          <button type="button" role="tab" id="tabDbml" aria-selected="false">DBML</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <pre class="code" id="code" tabindex="0"></pre>
+        <div class="actions">
+          <button type="button" id="copyBtn">Copy</button>
+          <span class="copied" id="copied" role="status"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<datalist id="types">
+  <option value="integer"><option value="bigint"><option value="serial"><option value="uuid">
+  <option value="varchar(255)"><option value="text"><option value="boolean"><option value="numeric(10,2)">
+  <option value="date"><option value="timestamp"><option value="timestamptz"><option value="jsonb">
+</datalist>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+const FIELD_LABEL = { name: "Name", type: "Type", pk: "Key", references: "Reference" };
+
+let schema = { tables: [], warnings: [] };
+let original = {};
+let ctl = null;
+let format = "ddl";
+
+/* =====================================================================
+   AI connection (bring your own key)
+   ===================================================================== */
+const DEFAULT_OR_MODELS = "nvidia/nemotron-3.5-super-vl:free, thinkingmachines/inkling:free, google/gemma-4-31b-it:free, openrouter/free";
+const PROVIDERS = {
+  openrouter: { label: "OpenRouter API key", placeholder: "sk-or-…",
+    hint: 'Free: create a key at <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">openrouter.ai/settings/keys</a>. Without $10 of lifetime credit, free models allow 50 requests a day per account; with it, 1,000.' },
+  anthropic: { label: "Claude API key", placeholder: "sk-ant-…",
+    hint: 'Paid, about $0.001 per extraction with Haiku. Create a key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a> and set a monthly spend limit there.' }
+};
+let provider = store.get("s2s.provider") === "anthropic" ? "anthropic" : "openrouter";
+const sessionKeys = { openrouter: "", anthropic: "" };
+
+function keyFor(p) { return sessionKeys[p] || store.get("s2s.key." + p) || ""; }
+function renderConn() {
+  const P = PROVIDERS[provider];
+  $("#provOR").setAttribute("aria-pressed", provider === "openrouter");
+  $("#provAN").setAttribute("aria-pressed", provider === "anthropic");
+  $("#keyLabel").textContent = P.label;
+  $("#apiKey").placeholder = P.placeholder;
+  $("#apiKey").value = keyFor(provider);
+  $("#provHint").innerHTML = P.hint;
+  $("#orModelsWrap").hidden = provider !== "openrouter";
+  $("#anModelWrap").hidden = provider !== "anthropic";
+  updateConnStatus();
+}
+function updateConnStatus() {
+  const has = !!keyFor(provider);
+  $("#connDot").classList.toggle("on", has);
+  $("#connText").textContent = has
+    ? (provider === "openrouter" ? "Ready · OpenRouter free models" : "Ready · Claude " + $("#anModel").value.replace("claude-", ""))
+    : "Add a key to enable Extract";
+  $("#extractBtn").disabled = !has;
+}
+function setProvider(p) { provider = p; store.set("s2s.provider", p); renderConn(); }
+$("#provOR").addEventListener("click", () => setProvider("openrouter"));
+$("#provAN").addEventListener("click", () => setProvider("anthropic"));
+$("#apiKey").addEventListener("input", (e) => {
+  const v = e.target.value.trim();
+  sessionKeys[provider] = v;
+  if ($("#remember").checked && v) store.set("s2s.key." + provider, v); else store.del("s2s.key." + provider);
+  updateConnStatus();
+});
+$("#remember").addEventListener("change", (e) => {
+  store.set("s2s.remember", e.target.checked ? "1" : "0");
+  const v = keyFor(provider);
+  if (e.target.checked && v) store.set("s2s.key." + provider, v); else store.del("s2s.key." + provider);
+});
+$("#forgetKey").addEventListener("click", () => {
+  sessionKeys[provider] = ""; store.del("s2s.key." + provider); $("#apiKey").value = ""; updateConnStatus();
+  showMsg("Key removed from this browser.");
+});
+$("#orModels").value = store.get("s2s.orModels") || DEFAULT_OR_MODELS;
+$("#orModels").addEventListener("change", (e) => store.set("s2s.orModels", e.target.value));
+$("#anModel").value = store.get("s2s.anModel") || "claude-haiku-5-5";
+$("#anModel").addEventListener("change", (e) => { store.set("s2s.anModel", e.target.value); updateConnStatus(); });
+$("#remember").checked = store.get("s2s.remember") !== "0";
+
+/* =====================================================================
+   Example draft (matches the example whiteboard)
+   ===================================================================== */
+const EXAMPLE = {
+  tables: [
+    { name: "customers", columns: [
+      { name: "id", type: "integer", type_guessed: true, pk: true },
+      { name: "name", type: "varchar(255)", type_guessed: true, nullable: false },
+      { name: "email", type: "varchar(255)", type_guessed: true, unique: true, nullable: false },
+      { name: "created_at", type: "timestamp", type_guessed: true, nullable: false } ] },
+    { name: "orders", columns: [
+      { name: "id", type: "integer", type_guessed: true, pk: true },
+      { name: "customer_id", type: "integer", type_guessed: true, nullable: false, references: "customers.id" },
+      { name: "status", type: "varchar(50)", type_guessed: true, nullable: false },
+      { name: "total", type: "numeric(10,2)", type_guessed: true, nullable: false },
+      { name: "ordered_at", type: "timestamp", type_guessed: true, nullable: false,
+        flags: [{ field: "name", note: "Last word could read \"ordered_on\". If it's a date, change the type to date." }] } ] },
+    { name: "order_items", columns: [
+      { name: "order_id", type: "integer", type_guessed: true, pk: true, references: "orders.id",
+        flags: [{ field: "pk", note: "Both order_id and product_id are underlined, so this reads as a composite key." }] },
+      { name: "product_id", type: "integer", type_guessed: true, pk: true, references: "products.id",
+        flags: [{ field: "references", note: "The line end at products is scribbled. Assumed many order items per product." }] },
+      { name: "qty", type: "integer", type_guessed: true, nullable: false,
+        flags: [{ field: "name", note: "Handwriting could also read \"oty\"." }] },
+      { name: "unit_price", type: "numeric(10,2)", type_guessed: true, nullable: false } ] },
+    { name: "products", columns: [
+      { name: "id", type: "integer", type_guessed: true, pk: true },
+      { name: "sku", type: "varchar(255)", type_guessed: true, unique: true, nullable: false },
+      { name: "name", type: "varchar(255)", type_guessed: true, nullable: false },
+      { name: "price", type: "numeric(10,2)", type_guessed: true, nullable: false } ] }
+  ],
+  warnings: ["The red note \"soft delete?\" next to customers wasn't turned into a column. Add deleted_at if you want it."]
+};
+
+/* =====================================================================
+   Model JSON -> editable schema
+   ===================================================================== */
+const normFlags = (f) => Array.isArray(f) ? f.filter((x) => x && FIELD_LABEL[x.field] && x.note).map((x) => ({ field: x.field, note: String(x.note) })) : [];
+
+function fromModel(data) {
+  const tables = (Array.isArray(data?.tables) ? data.tables : []).map((t) => ({
+    id: uid(), name: String(t?.name ?? ""), flags: normFlags(t?.flags),
+    columns: (Array.isArray(t?.columns) ? t.columns : []).map((c) => ({
+      id: uid(), name: String(c?.name ?? ""), type: String(c?.type ?? ""),
+      typeGuessed: !!c?.type_guessed, pk: !!c?.pk,
+      nullable: c?.nullable === undefined || c?.nullable === null ? !c?.pk : !!c.nullable,
+      unique: !!c?.unique, refName: c?.references ? String(c.references) : null, ref: null,
+      flags: normFlags(c?.flags)
+    }))
+  }));
+  for (const t of tables) for (const c of t.columns) {
+    if (!c.refName) continue;
+    const [tn, cn] = c.refName.split(".");
+    const tt = tables.find((x) => x.name.toLowerCase() === (tn || "").toLowerCase());
+    const cc = tt?.columns.find((x) => x.name.toLowerCase() === (cn || "id").toLowerCase());
+    if (tt && cc) c.ref = { t: tt.id, c: cc.id };
+    else if (!c.flags.some((f) => f.field === "references")) c.flags.push({ field: "references", note: `Points to ${c.refName}, which isn't in the draft.` });
+  }
+  const warnings = (Array.isArray(data?.warnings) ? data.warnings : []).map(String).filter(Boolean);
+  return { tables, warnings };
+}
+
+// Models reply with compact keys; convert to the shape fromModel() expects.
+const FLAG_FIELD = { name: "name", type: "type", pk: "pk", ref: "references", references: "references" };
+function fromCompact(r) {
+  const tables = (Array.isArray(r?.tables) ? r.tables : []).map((t) => ({
+    name: t?.n ?? "",
+    columns: (Array.isArray(t?.cols) ? t.cols : []).map((c) => {
+      const flags = [];
+      if (typeof c?.flag === "string" && c.flag.trim()) {
+        const m = c.flag.match(/^\s*(name|type|pk|ref|references)\s*:\s*(.+)$/i);
+        flags.push(m ? { field: FLAG_FIELD[m[1].toLowerCase()], note: m[2] } : { field: "name", note: c.flag.trim() });
+      }
+      return {
+        name: c?.n ?? "", type: c?.t ?? "", type_guessed: !!c?.g, pk: !!c?.pk,
+        nullable: typeof c?.nul === "boolean" ? c.nul : undefined, unique: !!c?.u,
+        references: c?.ref ? String(c.ref) : null, flags
+      };
+    })
+  }));
+  return { tables, warnings: Array.isArray(r?.warnings) ? r.warnings : [] };
+}
+
+function snapshot() {
+  original = {};
+  for (const t of schema.tables) {
+    original[t.id] = { name: t.name };
+    for (const c of t.columns) original[c.id] = { name: c.name, type: c.type, pk: c.pk, nullable: c.nullable, unique: c.unique, ref: refKey(c) };
+  }
+}
+const refKey = (c) => c.ref ? c.ref.t + "." + c.ref.c : "";
+function findObj(id) {
+  for (const t of schema.tables) { if (t.id === id) return t; for (const c of t.columns) if (c.id === id) return c; }
+  return null;
+}
+function colById(id) {
+  for (const t of schema.tables) for (const c of t.columns) if (c.id === id) return { t, c };
+  return null;
+}
+
+/* =====================================================================
+   Draft editor
+   ===================================================================== */
+function noteHtml(obj) {
+  if (!obj.flags.length) return "";
+  return `<div class="notes">${obj.flags.map((f) =>
+    `<div class="note" data-flag="${obj.id}|${f.field}"><span class="nf">${FIELD_LABEL[f.field]}</span><span class="nt">${esc(f.note)}</span><button type="button" class="chip-ok" data-flag="${obj.id}|${f.field}">Looks right</button></div>`).join("")}</div>`;
+}
+const fl = (obj, field) => obj.flags.some((f) => f.field === field) ? " is-flagged" : "";
+function refOptions(c) {
+  let html = `<option value="">No reference</option>`;
+  for (const t of schema.tables) for (const c2 of t.columns) {
+    if (c2.id === c.id) continue;
+    const v = t.id + "." + c2.id;
+    html += `<option value="${v}"${refKey(c) === v ? " selected" : ""}>→ ${esc(t.name || "untitled")}.${esc(c2.name || "untitled")}</option>`;
+  }
+  return html;
+}
+function colHtml(c) {
+  return `<div class="col" data-c="${c.id}">
+    <input class="in in-name${fl(c, "name")}" id="n-${c.id}" data-f="name" value="${esc(c.name)}" aria-label="Column name" spellcheck="false">
+    <span class="type-wrap"><input class="in in-type${fl(c, "type")}${c.typeGuessed ? " guessed" : ""}" id="y-${c.id}" data-f="type" list="types" value="${esc(c.type)}" aria-label="Type" spellcheck="false">${c.typeGuessed ? `<span class="guess-tag">guess</span>` : ""}</span>
+    <div class="toggles">
+      <label class="tg${fl(c, "pk")}" title="Primary key"><input type="checkbox" id="k-${c.id}" data-f="pk"${c.pk ? " checked" : ""}>PK</label>
+      <label class="tg" title="Allows null"><input type="checkbox" id="u-${c.id}" data-f="nullable"${c.nullable ? " checked" : ""}>NULL</label>
+      <label class="tg" title="Unique"><input type="checkbox" id="q-${c.id}" data-f="unique"${c.unique ? " checked" : ""}>UNIQ</label>
+    </div>
+    <select class="in in-ref${fl(c, "references")}" id="r-${c.id}" data-f="references" aria-label="References">${refOptions(c)}</select>
+    <button type="button" class="icon-btn del-col" aria-label="Remove column ${esc(c.name)}">×</button>
+  </div>${noteHtml(c)}`;
+}
+function render() {
+  const el = $("#tables");
+  if (!schema.tables.length) {
+    el.innerHTML = `<div class="empty">No tables in the draft yet. Extract them from a sketch, or add a table by hand.</div>`;
+  } else {
+    el.innerHTML = schema.tables.map((t) => `<div class="tbl" data-t="${t.id}">
+      <div class="tbl-head">
+        <input class="in in-tname${fl(t, "name")}" id="t-${t.id}" data-f="tname" value="${esc(t.name)}" aria-label="Table name" spellcheck="false">
+        <span class="tbl-meta">${t.columns.length} column${t.columns.length === 1 ? "" : "s"}</span>
+        <button type="button" class="quiet del-table">Remove table</button>
+      </div>
+      ${noteHtml(t)}
+      ${t.columns.length ? `<div class="col-head" aria-hidden="true"><span>Column</span><span>Type</span><span>Flags</span><span>References</span><span></span></div>` : ""}
+      <div class="cols">${t.columns.map(colHtml).join("")}</div>
+      <div class="tbl-foot"><button type="button" class="quiet add-col">+ Add column</button></div>
+    </div>`).join("");
+  }
+  const w = $("#warnings");
+  w.hidden = !schema.warnings.length;
+  w.innerHTML = schema.warnings.map((x) => `<li>${esc(x)}</li>`).join("");
+  updateSummary(); updateOutput();
+}
+function refreshRefOptions() {
+  document.querySelectorAll(".in-ref").forEach((sel) => {
+    const hit = colById(sel.closest("[data-c]").dataset.c);
+    if (hit) sel.innerHTML = refOptions(hit.c);
+  });
+}
+function updateSummary() {
+  let flags = 0, total = 0, kept = 0, cols = 0;
+  for (const t of schema.tables) { flags += t.flags.length; cols += t.columns.length; for (const c of t.columns) flags += c.flags.length; }
+  for (const id in original) {
+    const o = original[id], obj = findObj(id);
+    for (const k in o) { total++; if (!obj) continue; if ((k === "ref" ? refKey(obj) : obj[k]) === o[k]) kept++; }
+  }
+  const pct = total ? Math.round((kept / total) * 100) : null;
+  $("#summary").innerHTML =
+    `<span class="pill">${schema.tables.length} tables · ${cols} columns</span>` +
+    (flags ? `<span class="pill check">${flags} to check</span>` : `<span class="pill ok">All checked</span>`) +
+    (pct !== null ? `<span class="pill" title="Share of extracted fields still as the model drafted them">${pct}% kept as extracted</span>` : "");
+}
+
+/* SQL / DBML */
+const RESERVED = new Set(["user", "order", "group", "table", "select", "from", "where", "limit", "offset", "column", "check", "default", "references", "primary", "key", "end", "to", "desc", "asc", "all", "and", "or", "not", "null", "true", "false", "case", "when", "grant", "role"]);
+const q = (n) => /^[a-z_][a-z0-9_]*$/.test(n) && !RESERVED.has(n) ? n : `"${String(n).replace(/"/g, '""')}"`;
+const tName = (t) => t.name.trim() || "untitled_table";
+const cName = (c) => c.name.trim() || "untitled_column";
+const cType = (c) => c.type.trim() || "text";
+function toDDL() {
+  if (!schema.tables.length) return "-- No tables yet.";
+  const out = [], fks = [];
+  for (const t of schema.tables) {
+    const pks = t.columns.filter((c) => c.pk);
+    const lines = t.columns.map((c) => {
+      let l = `  ${q(cName(c))} ${cType(c)}`;
+      if (pks.length === 1 && c.pk) l += " PRIMARY KEY"; else if (!c.nullable) l += " NOT NULL";
+      if (c.unique && !(pks.length === 1 && c.pk)) l += " UNIQUE";
+      return l;
+    });
+    if (pks.length > 1) lines.push(`  PRIMARY KEY (${pks.map((c) => q(cName(c))).join(", ")})`);
+    out.push(`CREATE TABLE ${q(tName(t))} (\n${lines.join(",\n")}\n);`);
+    for (const c of t.columns) if (c.ref) {
+      const hit = colById(c.ref.c);
+      if (hit) fks.push(`ALTER TABLE ${q(tName(t))}\n  ADD FOREIGN KEY (${q(cName(c))}) REFERENCES ${q(tName(hit.t))} (${q(cName(hit.c))});`);
+    }
+  }
+  return out.join("\n\n") + (fks.length ? "\n\n" + fks.join("\n\n") : "") + "\n";
+}
+function toDBML() {
+  if (!schema.tables.length) return "// No tables yet.";
+  const dq = (n) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n) ? n : `"${n.replace(/"/g, '\\"')}"`;
+  return schema.tables.map((t) => {
+    const pks = t.columns.filter((c) => c.pk);
+    const lines = t.columns.map((c) => {
+      const s = [];
+      if (pks.length === 1 && c.pk) s.push("pk"); else if (!c.nullable) s.push("not null");
+      if (c.unique && !(pks.length === 1 && c.pk)) s.push("unique");
+      if (c.ref) { const hit = colById(c.ref.c); if (hit) s.push(`ref: > ${dq(tName(hit.t))}.${dq(cName(hit.c))}`); }
+      return `  ${dq(cName(c))} ${cType(c).replace(/\s+/g, "")}${s.length ? ` [${s.join(", ")}]` : ""}`;
+    });
+    if (pks.length > 1) lines.push(`\n  indexes {\n    (${pks.map((c) => dq(cName(c))).join(", ")}) [pk]\n  }`);
+    return `Table ${dq(tName(t))} {\n${lines.join("\n")}\n}`;
+  }).join("\n\n") + "\n";
+}
+function updateOutput() { $("#code").textContent = format === "ddl" ? toDDL() : toDBML(); }
+
+/* Editing */
+function clearFlag(obj, field, marked) {
+  if (!obj || !obj.flags.some((f) => f.field === field)) return;
+  obj.flags = obj.flags.filter((f) => f.field !== field);
+  document.querySelectorAll(`.note[data-flag="${obj.id}|${field}"]`).forEach((n) => {
+    const box = n.parentElement; n.remove(); if (box && !box.children.length) box.remove();
+  });
+  marked?.classList.remove("is-flagged");
+}
+$("#tables").addEventListener("input", (e) => {
+  const el = e.target, f = el.dataset.f;
+  if (!f) return;
+  const t = schema.tables.find((x) => x.id === el.closest("[data-t]")?.dataset.t);
+  if (!t) return;
+  if (f === "tname") { t.name = el.value; clearFlag(t, "name", el); refreshRefOptions(); }
+  else {
+    const c = t.columns.find((x) => x.id === el.closest("[data-c]")?.dataset.c);
+    if (!c) return;
+    if (f === "name") { c.name = el.value; clearFlag(c, "name", el); refreshRefOptions(); }
+    if (f === "type") {
+      c.type = el.value; clearFlag(c, "type", el);
+      if (c.typeGuessed) { c.typeGuessed = false; el.classList.remove("guessed"); el.parentElement.querySelector(".guess-tag")?.remove(); }
+    }
+    if (f === "pk") { c.pk = el.checked; if (c.pk) { c.nullable = false; const n = $("#u-" + c.id); if (n) n.checked = false; } clearFlag(c, "pk", el.closest(".tg")); }
+    if (f === "nullable") c.nullable = el.checked;
+    if (f === "unique") c.unique = el.checked;
+    if (f === "references") { const [tid, cid] = el.value.split("."); c.ref = el.value ? { t: tid, c: cid } : null; clearFlag(c, "references", el); }
+  }
+  updateSummary(); updateOutput();
+});
+$("#tables").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.classList.contains("chip-ok")) {
+    const [id, field] = b.dataset.flag.split("|");
+    const marked = field === "pk" ? $("#k-" + id)?.closest(".tg")
+      : field === "name" ? ($("#n-" + id) || $("#t-" + id)) : field === "type" ? $("#y-" + id) : $("#r-" + id);
+    clearFlag(findObj(id), field, marked); updateSummary(); return;
+  }
+  const t = schema.tables.find((x) => x.id === b.closest("[data-t]")?.dataset.t);
+  if (!t) return;
+  if (b.classList.contains("del-col")) {
+    const cid = b.closest("[data-c]").dataset.c;
+    t.columns = t.columns.filter((c) => c.id !== cid);
+    for (const tt of schema.tables) for (const c of tt.columns) if (c.ref?.c === cid) c.ref = null;
+    render();
+  } else if (b.classList.contains("add-col")) {
+    const c = { id: uid(), name: "", type: "", typeGuessed: false, pk: false, nullable: true, unique: false, ref: null, flags: [] };
+    t.columns.push(c); render(); $("#n-" + c.id)?.focus();
+  } else if (b.classList.contains("del-table")) {
+    const ids = new Set(t.columns.map((c) => c.id));
+    schema.tables = schema.tables.filter((x) => x.id !== t.id);
+    for (const tt of schema.tables) for (const c of tt.columns) if (c.ref && ids.has(c.ref.c)) c.ref = null;
+    render();
+  }
+});
+$("#addTable").addEventListener("click", () => {
+  const t = { id: uid(), name: "", flags: [], columns: [{ id: uid(), name: "id", type: "integer", typeGuessed: false, pk: true, nullable: false, unique: false, ref: null, flags: [] }] };
+  schema.tables.push(t); render(); $("#t-" + t.id)?.focus();
+});
+
+/* Export tabs + copy */
+function setFormat(f) {
+  format = f;
+  $("#tabDdl").setAttribute("aria-selected", f === "ddl");
+  $("#tabDbml").setAttribute("aria-selected", f === "dbml");
+  updateOutput();
+}
+$("#tabDdl").addEventListener("click", () => setFormat("ddl"));
+$("#tabDbml").addEventListener("click", () => setFormat("dbml"));
+$("#copyBtn").addEventListener("click", () => {
+  const text = $("#code").textContent;
+  const done = (m) => { $("#copied").textContent = m; setTimeout(() => ($("#copied").textContent = ""), 2500); };
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#code")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done("Selected. Press Ctrl+C or ⌘C to copy."); };
+  try { navigator.clipboard.writeText(text).then(() => done("Copied"), fallback); } catch { fallback(); }
+});
+
+/* =====================================================================
+   Sketch board: Photo mode and Draw mode share one canvas
+   ===================================================================== */
+const cv = $("#sketch"), cx = cv.getContext("2d"), board = $("#board");
+let mode = "photo";
+let photoImg = null;          // uploaded photo; null = example whiteboard
+let photoName = "Example whiteboard (shop schema)";
+
+function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+function drawExample() {
+  cv.width = 1200; cv.height = 760;
+  const x = cx, r = mulberry(7), j = (n) => (r() - 0.5) * n;
+  x.fillStyle = "#f6f7f4"; x.fillRect(0, 0, cv.width, cv.height);
+  for (let i = 0; i < 6; i++) { x.fillStyle = "rgba(90,100,110,0.035)"; x.beginPath(); x.ellipse(r() * 1200, r() * 760, 160 + r() * 200, 50 + r() * 70, r() * 3, 0, 7); x.fill(); }
+  x.lineCap = "round"; x.lineJoin = "round";
+  const line = (x1, y1, x2, y2, col = "#1e3a8a", w = 3) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); x.moveTo(x1 + j(3), y1 + j(3)); x.quadraticCurveTo((x1 + x2) / 2 + j(8), (y1 + y2) / 2 + j(8), x2 + j(3), y2 + j(3)); x.stroke(); };
+  const text = (s, tx, ty, size = 32, bold = false, col = "#1f2328", rot = 0) => { x.save(); x.translate(tx, ty); x.rotate(rot + j(0.03)); x.fillStyle = col; x.font = `${bold ? "700 " : ""}${size}px Kalam, "Comic Sans MS", cursive`; x.fillText(s, 0, 0); x.restore(); };
+  const crow = (px, py, fx, fy, col = "#1e3a8a") => { const dx = px - fx, dy = py - fy, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, bx = px - ux * 26, by = py - uy * 26; for (const s of [-1, 0, 1]) line(bx, by, px - uy * 14 * s, py + ux * 14 * s, col, 2.6); };
+  const B = {
+    customers: { x: 60, y: 70, w: 300, rows: ["id", "name", "email (unique)", "created_at"], pk: [0] },
+    orders: { x: 470, y: 70, w: 300, rows: ["id", "customer_id", "status", "total", "ordered_at"], pk: [0] },
+    order_items: { x: 470, y: 440, w: 320, rows: ["order_id", "product_id", "qty", "unit_price"], pk: [0, 1] },
+    products: { x: 885, y: 440, w: 265, rows: ["id", "sku", "name", "price"], pk: [0] }
+  };
+  const rowY = (b, i) => b.y + 70 + i * 44 + 24;
+  for (const [name, b] of Object.entries(B)) {
+    const h = 82 + b.rows.length * 44;
+    line(b.x, b.y, b.x + b.w, b.y); line(b.x + b.w, b.y, b.x + b.w, b.y + h); line(b.x + b.w, b.y + h, b.x, b.y + h); line(b.x, b.y + h, b.x, b.y);
+    line(b.x + 6, b.y + 62, b.x + b.w - 8, b.y + 62, "#1e3a8a", 2);
+    text(name, b.x + 18, b.y + 44, 34, true);
+    b.rows.forEach((s, i) => { text(s, b.x + 22, rowY(b, i), 30); if (b.pk.includes(i)) { x.font = "30px Kalam, cursive"; const wdt = x.measureText(s).width; line(b.x + 20, rowY(b, i) + 7, b.x + 24 + wdt, rowY(b, i) + 9, "#1f2328", 2.2); } });
+  }
+  line(B.customers.x + B.customers.w, rowY(B.customers, 0) - 10, B.orders.x, rowY(B.orders, 1) - 10);
+  crow(B.orders.x, rowY(B.orders, 1) - 10, B.customers.x + B.customers.w, rowY(B.customers, 0) - 10);
+  const oy = B.orders.y + 82 + 5 * 44;
+  line(560, oy, 560, B.order_items.y); crow(560, B.order_items.y, 560, oy);
+  const py0 = rowY(B.order_items, 1) - 10, py1 = rowY(B.products, 0) - 10;
+  line(B.order_items.x + B.order_items.w, py0, B.products.x - 4, py1);
+  x.strokeStyle = "#1e3a8a"; x.lineWidth = 2.4; x.beginPath();
+  for (let i = 0; i < 7; i++) x.lineTo(B.products.x - 30 + i * 4 + j(6), py1 - 12 + (i % 2) * 22 + j(4));
+  x.stroke();
+  text("soft delete?", 92, 470, 30, false, "#b42318", -0.06);
+  line(170, 440, 190, 362, "#b42318", 2.4); line(190, 362, 178, 378, "#b42318", 2.4); line(190, 362, 200, 379, "#b42318", 2.4);
+  text("shop v1 · 3/11", 960, 60, 24, false, "#5b6470", 0.02);
+}
+function drawPhoto() {
+  if (!photoImg) { drawExample(); return; }
+  const scale = Math.min(1, 1600 / Math.max(photoImg.naturalWidth, photoImg.naturalHeight));
+  cv.width = Math.round(photoImg.naturalWidth * scale); cv.height = Math.round(photoImg.naturalHeight * scale);
+  cx.drawImage(photoImg, 0, 0, cv.width, cv.height);
+}
+
+/* ---------- Draw mode ---------- */
+const INK = "#1f2328";
+let shapes = [];
+let history = [];
+let tool = "box";
+let drag = null;              // in-progress shape while the pointer is down
+let erasing = false;
+try { const saved = JSON.parse(store.get("s2s.drawing") || "[]"); if (Array.isArray(saved)) shapes = saved; } catch {}
+
+function pushHistory() { history.push(JSON.stringify(shapes)); if (history.length > 100) history.shift(); }
+function saveDrawing() { store.set("s2s.drawing", JSON.stringify(shapes)); }
+
+function crowFoot(x, ux, uy, px, py) {
+  const bx = px - ux * 24, by = py - uy * 24;
+  for (const s of [-1, 0, 1]) { x.beginPath(); x.moveTo(bx, by); x.lineTo(px - uy * 13 * s, py + ux * 13 * s); x.stroke(); }
+}
+function paintShape(x, s) {
+  x.strokeStyle = INK; x.fillStyle = INK; x.lineCap = "round"; x.lineJoin = "round";
+  if (s.type === "pen") {
+    x.lineWidth = 3; x.beginPath();
+    s.pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
+    if (s.pts.length === 1) x.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]);
+    x.stroke();
+  } else if (s.type === "box") {
+    x.lineWidth = 3; x.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+  } else if (s.type === "line" || s.type === "many") {
+    x.lineWidth = 2.6; x.beginPath(); x.moveTo(s.x1, s.y1); x.lineTo(s.x2, s.y2); x.stroke();
+    const L = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+    if (s.type === "many" && L > 30) {
+      const ux = (s.x2 - s.x1) / L, uy = (s.y2 - s.y1) / L;
+      crowFoot(x, ux, uy, s.x2, s.y2);
+      // "one" end: a short bar across the line
+      const ox = s.x1 + ux * 14, oy = s.y1 + uy * 14;
+      x.beginPath(); x.moveTo(ox - uy * 11, oy + ux * 11); x.lineTo(ox + uy * 11, oy - ux * 11); x.stroke();
+    }
+  } else if (s.type === "text") {
+    x.font = `${s.size || 30}px Kalam, "Comic Sans MS", cursive`; x.textBaseline = "alphabetic"; x.fillText(s.text, s.x, s.y);
+  }
+}
+function drawBoard(withGrid = true) {
+  cv.width = 1200; cv.height = 760;
+  cx.fillStyle = "#fbfbf9"; cx.fillRect(0, 0, cv.width, cv.height);
+  if (withGrid) {
+    cx.fillStyle = "rgba(60,80,75,0.16)";
+    for (let gx = 20; gx < cv.width; gx += 40) for (let gy = 20; gy < cv.height; gy += 40) cx.fillRect(gx - 1, gy - 1, 2, 2);
+  }
+  for (const s of shapes) paintShape(cx, s);
+  if (drag) paintShape(cx, drag);
+  $("#drawHint").hidden = mode !== "draw" || shapes.length > 0 || !!drag;
+}
+function redraw() { if (mode === "draw") drawBoard(true); else drawPhoto(); }
+
+function toCanvas(e) {
+  const r = cv.getBoundingClientRect();
+  return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height];
+}
+function distToSeg(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+  const t = L2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / L2)) : 0;
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+function hit(s, px, py) {
+  const tol = 12;
+  if (s.type === "pen") return s.pts.some(([a, b], i) => i ? distToSeg(px, py, s.pts[i - 1][0], s.pts[i - 1][1], a, b) < tol : Math.hypot(px - a, py - b) < tol);
+  if (s.type === "line" || s.type === "many") return distToSeg(px, py, s.x1, s.y1, s.x2, s.y2) < tol;
+  if (s.type === "box") {
+    const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2), y1 = Math.min(s.y1, s.y2), y2 = Math.max(s.y1, s.y2);
+    return [[x1, y1, x2, y1], [x2, y1, x2, y2], [x2, y2, x1, y2], [x1, y2, x1, y1]].some(([a, b, c, d]) => distToSeg(px, py, a, b, c, d) < tol);
+  }
+  if (s.type === "text") {
+    cx.font = `${s.size || 30}px Kalam, cursive`;
+    const w = cx.measureText(s.text).width, h = s.size || 30;
+    return px >= s.x - 4 && px <= s.x + w + 4 && py >= s.y - h && py <= s.y + 8;
+  }
+  return false;
+}
+function eraseAt(px, py) {
+  for (let i = shapes.length - 1; i >= 0; i--) if (hit(shapes[i], px, py)) { shapes.splice(i, 1); drawBoard(); return true; }
+  return false;
+}
+
+cv.addEventListener("pointerdown", (e) => {
+  if (mode !== "draw" || e.button > 0) return;
+  e.preventDefault();
+  const [px, py] = toCanvas(e);
+  if (tool === "text") { openTextInput(px, py); return; }
+  cv.setPointerCapture(e.pointerId);
+  if (tool === "eraser") { erasing = { snap: JSON.stringify(shapes), any: false }; if (eraseAt(px, py)) erasing.any = true; return; }
+  if (tool === "pen") drag = { type: "pen", pts: [[px, py]] };
+  else drag = { type: tool, x1: px, y1: py, x2: px, y2: py };
+  drawBoard();
+});
+cv.addEventListener("pointermove", (e) => {
+  if (mode !== "draw") return;
+  const [px, py] = toCanvas(e);
+  if (erasing) { if (eraseAt(px, py)) erasing.any = true; return; }
+  if (!drag) return;
+  if (drag.type === "pen") drag.pts.push([px, py]); else { drag.x2 = px; drag.y2 = py; }
+  drawBoard();
+});
+function endStroke() {
+  if (erasing) {
+    if (erasing.any) { history.push(erasing.snap); if (history.length > 100) history.shift(); saveDrawing(); }
+    erasing = false; return;
+  }
+  if (!drag) return;
+  const s = drag; drag = null;
+  const big = s.type === "pen" ? s.pts.length > 1 : Math.hypot(s.x2 - s.x1, s.y2 - s.y1) > 8;
+  if (big) { pushHistory(); shapes.push(s); saveDrawing(); }
+  drawBoard();
+}
+cv.addEventListener("pointerup", endStroke);
+cv.addEventListener("pointercancel", endStroke);
+
+/* Text tool: an input placed over the canvas */
+let textBox = null;
+function openTextInput(px, py) {
+  closeTextInput(true);
+  const r = cv.getBoundingClientRect(), br = board.getBoundingClientRect(), k = r.width / cv.width;
+  const size = 30;
+  const inp = document.createElement("input");
+  inp.className = "text-input"; inp.type = "text"; inp.setAttribute("aria-label", "Text to add");
+  inp.style.left = (r.left - br.left + px * k) + "px";
+  inp.style.top = (r.top - br.top + (py - size) * k) + "px";
+  inp.style.fontSize = Math.max(12, size * k) + "px";
+  inp.style.height = Math.max(18, (size + 10) * k) + "px";
+  board.appendChild(inp);
+  textBox = { inp, x: px, y: py + 4, size };
+  inp.focus();
+  requestAnimationFrame(() => { if (textBox?.inp === inp && document.activeElement !== inp) inp.focus(); });
+  inp.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { ev.preventDefault(); const next = textBox ? { x: textBox.x, y: textBox.y + 40 } : null; closeTextInput(true); if (next && ev.shiftKey === false && next.y < cv.height - 10) openTextInput(next.x, next.y - 4); }
+    if (ev.key === "Escape") { ev.preventDefault(); closeTextInput(false); }
+  });
+  inp.addEventListener("blur", () => setTimeout(() => { if (textBox?.inp === inp) closeTextInput(true); }, 0));
+}
+function closeTextInput(commit) {
+  if (!textBox) return;
+  const { inp, x, y, size } = textBox; textBox = null;
+  const v = inp.value.trim();
+  inp.remove();
+  if (commit && v) { pushHistory(); shapes.push({ type: "text", x, y, size, text: v }); saveDrawing(); }
+  drawBoard();
+}
+
+/* Toolbar */
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll("#drawBar [data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
+  board.classList.toggle("t-eraser", t === "eraser"); board.classList.toggle("t-text", t === "text");
+}
+document.querySelectorAll("#drawBar [data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+function undo() { if (!history.length) return; shapes = JSON.parse(history.pop()); saveDrawing(); drawBoard(); }
+$("#undoBtn").addEventListener("click", undo);
+let clearArmed = false;
+$("#clearBtn").addEventListener("click", () => {
+  if (!shapes.length) return;
+  if (!clearArmed) { clearArmed = true; $("#clearBtn").textContent = "Click again to clear"; setTimeout(() => { clearArmed = false; $("#clearBtn").textContent = "Clear"; }, 2500); return; }
+  clearArmed = false; $("#clearBtn").textContent = "Clear";
+  pushHistory(); shapes = []; saveDrawing(); drawBoard();
+});
+document.addEventListener("keydown", (e) => {
+  if (mode !== "draw" || e.target.closest("input, textarea, select")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  const map = { b: "box", t: "text", l: "line", m: "many", p: "pen", e: "eraser" };
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
+});
+
+/* Mode switch */
+function setMode(m) {
+  closeTextInput(true);
+  mode = m;
+  $("#modePhoto").setAttribute("aria-selected", m === "photo");
+  $("#modeDraw").setAttribute("aria-selected", m === "draw");
+  $("#photoBar").hidden = m !== "photo";
+  $("#drawBar").hidden = m !== "draw";
+  board.classList.toggle("drawing", m === "draw");
+  $("#sourceName").textContent = m === "draw" ? "Your drawing" : photoName;
+  $("#sourceTip").textContent = m === "draw" ? "Saved in this browser as you draw" : "Drop or paste an image here too";
+  redraw();
+}
+$("#modePhoto").addEventListener("click", () => setMode("photo"));
+$("#modeDraw").addEventListener("click", () => setMode("draw"));
+
+/* Photo sources: upload, drop, paste */
+function showMsg(text, isErr = false) { const m = $("#msg"); m.hidden = !text; m.textContent = text || ""; m.classList.toggle("err", isErr); }
+async function takeFile(file) {
+  if (!file || !/^image\//.test(file.type)) { showMsg("That isn't an image. Use a JPEG, PNG, WebP or GIF photo of the sketch.", true); return; }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
+    photoImg = img; photoName = file.name || "Pasted image";
+    setMode("photo");
+    showMsg("Photo ready. Press Extract schema to draft the tables.");
+  } catch { showMsg("That image couldn't be opened. Try another file.", true); }
+}
+$("#fileInput").addEventListener("change", (e) => { takeFile(e.target.files[0]); e.target.value = ""; });
+board.addEventListener("dragover", (e) => { e.preventDefault(); board.classList.add("drag"); });
+board.addEventListener("dragleave", () => board.classList.remove("drag"));
+board.addEventListener("drop", (e) => { e.preventDefault(); board.classList.remove("drag"); takeFile(e.dataTransfer.files[0]); });
+document.addEventListener("paste", (e) => {
+  if (e.target.closest?.("input, textarea, select")) return;
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (item) { e.preventDefault(); takeFile(item.getAsFile()); }
+});
+$("#useExample").addEventListener("click", () => { photoImg = null; photoName = "Example whiteboard (shop schema)"; setMode("photo"); showMsg(""); });
+
+/* =====================================================================
+   Extraction: browser → provider, with the person's own key
+   ===================================================================== */
+const PROMPT = `The image is a database schema (ER diagram) — a whiteboard photo, a paper sketch, or a drawing made on screen with boxes, typed text and lines.
+Extract every table, column and relationship. Reply with ONLY a JSON object, no other text, in exactly this shape:
+{"tables":[{"n":"orders","cols":[{"n":"id","t":"integer","g":true,"pk":true,"nul":false,"u":false,"ref":"","flag":""},{"n":"customer_id","t":"integer","g":true,"pk":false,"nul":false,"u":false,"ref":"customers.id","flag":"ref: line end is faint, assumed many orders per customer"}]}],"warnings":[]}
+
+Keys: n=name, t=SQL type, g=type was inferred (not written), pk=primary key, nul=nullable, u=unique, ref="table.column" or "", flag="field: note" or "" (field is name|type|pk|ref).
+Rules:
+- A box is a table. Its first or top text is the table name; the other lines are columns.
+- Names lowercase snake_case as written. Don't invent tables or columns.
+- Use a written type if present (e.g. "price numeric"); otherwise infer and set g=true: id/*_id integer, *_at timestamp, *_on/*_date date, is_*/has_* boolean, price/amount/total numeric(10,2), qty/count integer, description/notes text, other text varchar(255).
+- pk=true for underlined, "PK" or key-marked names. nul=false for pk and required columns.
+- Lines between boxes are relationships. A crow's-foot (three short prongs) marks the "many" side, which holds the foreign key; a short bar marks the "one" side.
+- flag only real doubts (unreadable text, unclear line direction, guessed key).
+- warnings: notes or crossed-out items you did not turn into schema. If the image is not a schema, return {"tables":[],"warnings":["<what it shows>"]}.`;
+
+const SCHEMA = {
+  type: "object", additionalProperties: false, required: ["tables", "warnings"],
+  properties: {
+    warnings: { type: "array", items: { type: "string" } },
+    tables: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["n", "cols"],
+      properties: {
+        n: { type: "string" },
+        cols: { type: "array", items: {
+          type: "object", additionalProperties: false, required: ["n", "t", "g", "pk", "nul", "u", "ref", "flag"],
+          properties: { n: { type: "string" }, t: { type: "string" }, g: { type: "boolean" }, pk: { type: "boolean" },
+            nul: { type: "boolean" }, u: { type: "boolean" }, ref: { type: "string" }, flag: { type: "string" } } } }
+      } } }
+  }
+};
+
+function prepareImage(maxEdge = 1300) {
+  if (mode === "draw") drawBoard(false);          // send the drawing without the dot grid
+  const scale = Math.min(1, maxEdge / Math.max(cv.width, cv.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(cv.width * scale); c.height = Math.round(cv.height * scale);
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(cv, 0, 0, c.width, c.height);
+  if (mode === "draw") drawBoard(true);
+  return c.toDataURL("image/jpeg", 0.88);
+}
+
+function parseJson(text) {
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1];
+  const braces = text.includes("{") ? text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1) : "";
+  for (const t of [text, fence, braces]) { if (!t) continue; try { return JSON.parse(t); } catch {} }
+  return null;
+}
+const validShape = (v) => !!v && Array.isArray(v.tables) &&
+  v.tables.every((t) => typeof t?.n === "string" && Array.isArray(t.cols) && t.cols.every((c) => typeof c?.n === "string"));
+
+async function apiError(res) {
+  let detail = "";
+  try { const b = await res.json(); detail = b?.error?.message || b?.message || ""; } catch {}
+  return detail;
+}
+
+async function extractOpenRouter(key, dataUrl, signal) {
+  const models = ($("#orModels").value || DEFAULT_OR_MODELS).split(",").map((s) => s.trim()).filter(Boolean);
+  let last = "No free model could read the sketch right now. Try again in a minute.";
+  for (const model of models) {
+    $("#busyText").textContent = `Reading the sketch with ${model}…`;
+    let res;
+    try {
+      res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST", signal,
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": location.origin, "X-Title": "Sketch to Schema" },
+        body: JSON.stringify({ model, max_tokens: 4000, temperature: 0,
+          messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: dataUrl } }] }] })
+      });
+    } catch (e) { if (e?.name === "AbortError") throw e; last = "Couldn't reach OpenRouter. Check your connection."; continue; }
+    if (res.status === 401) throw new Error("OpenRouter rejected the key. Check it under AI connection.");
+    if (res.status === 402) throw new Error("Your OpenRouter balance is below zero, which blocks free models too. Add credit at openrouter.ai.");
+    if (res.status === 429) {
+      const d = await apiError(res);
+      if (/per-day|per day|daily/i.test(d)) throw new Error("You've used today's free requests on this OpenRouter account. They reset at 00:00 UTC.");
+      last = "Free models are busy. Try again in a minute."; continue;
+    }
+    if (!res.ok) { last = (await apiError(res)) || `A free model failed (${res.status}).`; continue; }
+    const msg = await res.json();
+    if (msg.error) { last = msg.error.message || "A free model failed to answer."; continue; }
+    const choice = msg.choices?.[0];
+    if (choice?.finish_reason === "length") { last = "The diagram was too large for one pass. Crop it into parts."; continue; }
+    const parsed = parseJson(choice?.message?.content || "");
+    if (validShape(parsed)) return { result: parsed, model: msg.model || model };
+    last = "A free model's reply couldn't be read. Try again.";
+  }
+  throw new Error(last);
+}
+
+async function extractClaude(key, dataUrl, signal) {
+  const model = $("#anModel").value;
+  $("#busyText").textContent = `Reading the sketch with ${model}…`;
+  const [meta, data] = dataUrl.split(",");
+  const media = meta.match(/data:(.*?);/)[1];
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", signal,
+      headers: {
+        "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model, max_tokens: 4000,
+        output_config: { format: { type: "json_schema", schema: SCHEMA } },
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: media, data } },
+          { type: "text", text: PROMPT }
+        ] }]
+      })
+    });
+  } catch (e) { if (e?.name === "AbortError") throw e; throw new Error("Couldn't reach the Claude API. Check your connection."); }
+  if (res.status === 401) throw new Error("The Claude API rejected the key. Check it under AI connection.");
+  if (res.status === 429) throw new Error("Rate limit reached on your Claude API key. Wait a minute and try again.");
+  if (res.status === 529) throw new Error("The Claude API is overloaded right now. Try again shortly.");
+  if (!res.ok) throw new Error((await apiError(res)) || `The Claude API returned an error (${res.status}).`);
+  const msg = await res.json();
+  if (msg.stop_reason === "refusal") throw new Error("Claude declined to read this image. Try a different sketch.");
+  if (msg.stop_reason === "max_tokens") throw new Error("The diagram was too large for one pass. Crop it into parts.");
+  const parsed = parseJson(msg.content?.find((b) => b.type === "text")?.text || "");
+  if (!validShape(parsed)) throw new Error("The reply couldn't be read. Try again.");
+  return { result: parsed, model };
+}
+
+$("#extractBtn").addEventListener("click", async () => {
+  closeTextInput(true);
+  const key = keyFor(provider);
+  if (!key) { showMsg("Add your API key under AI connection first.", true); $("#apiKey").focus(); return; }
+  if (mode === "draw" && !shapes.length) { showMsg("Draw something first: a box per table with its name and columns.", true); return; }
+  ctl = new AbortController();
+  $("#busy").hidden = false; $("#busyText").textContent = "Reading the sketch…"; $("#extractBtn").disabled = true; showMsg("");
+  try {
+    const dataUrl = prepareImage();
+    const out = provider === "anthropic" ? await extractClaude(key, dataUrl, ctl.signal) : await extractOpenRouter(key, dataUrl, ctl.signal);
+    const next = fromModel(fromCompact(out.result));
+    if (!next.tables.length) {
+      showMsg(next.warnings[0] ? `No tables found. ${next.warnings[0]}` : "No tables found. Try a clearer sketch.", true);
+      return;
+    }
+    schema = next; snapshot(); render();
+    const n = schema.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
+    showMsg(`Drafted ${schema.tables.length} tables with ${out.model}. ${n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over."}`);
+  } catch (e) {
+    if (e?.name === "AbortError") showMsg("Stopped. The draft wasn't changed.");
+    else showMsg(e?.message || "Extraction failed. Try again.", true);
+  } finally {
+    $("#busy").hidden = true; ctl = null; updateConnStatus();
+  }
+});
+$("#stopBtn").addEventListener("click", () => ctl?.abort());
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+schema = fromModel(EXAMPLE); snapshot(); render();
+renderConn();
+setMode("photo");
+document.fonts?.ready?.then(() => redraw());
+</script>
+</body>
+</html>
