@@ -3,9 +3,6 @@
 
 export const INK = "#1f2328";
 
-// Thicker strokes on bigger boards, so they read the same at Fit.
-export const strokeScale = (boardW) => Math.max(1, boardW / 1200);
-
 function crowFoot(ctx, ux, uy, px, py, sf) {
   const bx = px - ux * 24 * sf, by = py - uy * 24 * sf;
   for (const s of [-1, 0, 1]) {
@@ -46,9 +43,8 @@ export function distToSeg(px, py, x1, y1, x2, y2) {
 
 function textWidth(ctx, s) { ctx.font = `${s.size || 30}px Kalam, cursive`; return ctx.measureText(s.text).width; }
 
-// Is the point (px, py) on this shape? Used by the eraser.
-export function hitShape(ctx, s, px, py) {
-  const tol = 12;
+// Is the point (px, py) within tol of this shape? Used by the eraser.
+export function hitShape(ctx, s, px, py, tol = 12) {
   if (s.type === "pen") return s.pts.some(([a, b], i) => (i ? distToSeg(px, py, s.pts[i - 1][0], s.pts[i - 1][1], a, b) < tol : Math.hypot(px - a, py - b) < tol));
   if (s.type === "line" || s.type === "many") return distToSeg(px, py, s.x1, s.y1, s.x2, s.y2) < tol;
   if (s.type === "box") {

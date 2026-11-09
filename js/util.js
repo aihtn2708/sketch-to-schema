@@ -23,3 +23,6 @@ export function showMsg(text, isErr = false) {
   m.textContent = text || "";
   m.classList.toggle("err", isErr);
 }
+
+// A file-name-safe version of a name ("Shop schema (v2)" → "shop-schema-v2").
+export const slug = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";

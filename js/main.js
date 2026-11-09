@@ -6,6 +6,7 @@ import "./schema/editor.js";
 import "./schema/export-panel.js";
 import { redraw } from "./sketch/board.js";
 import "./sketch/draw-tools.js";
+import "./diagram/diagram.js";
 import "./extract.js";
 import { initProjects } from "./projects/projects.js";
 import { state } from "./state.js";

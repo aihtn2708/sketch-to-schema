@@ -44,7 +44,7 @@ Notes:
 
 ## Projects
 
-Everything on the page (the photo or drawing, board settings and the draft schema) is saved as a **project** in your browser, automatically as you work.
+Everything on the page (the photo or drawing, the draft schema and the diagram layout) is saved as a **project** in your browser, automatically as you work.
 
 - **New** starts a blank project. Rename it in the box at the top.
 - **Projects** lists your projects with a preview: open, duplicate, export or delete them, and search by name.
@@ -63,15 +63,19 @@ Projects live in this browser only. Clearing site data, or a private window, rem
   - **1 → many** (M): drag from the "one" table to the "many" table; it draws a bar and a crow's foot.
   - **Line** (L), **Eraser** (E), **Undo** (Ctrl/⌘+Z), **Clear**.
   - The drawing is saved with the project as you go.
-- **During a meeting:**
-  - **Board:** Standard, Wide or Large drawing space. Bigger boards raise the text size so it stays readable.
+- **The board has no edges.** Keep drawing in any direction:
+  - Drag a shape past the edge of the board and it scrolls with you.
+  - **Hand** (H): drag to move around. You can also hold Space and drag, drag with the middle mouse button, or use the arrow keys.
+  - **Zoom:** −, + and **Fit** (keys −, + and 0; Ctrl/⌘ + scroll or a trackpad pinch; two-finger pinch on a touch screen). Fit shows the whole drawing.
   - **Text:** Small, Medium or Large for new text.
-  - **Zoom:** −, + and **Fit** (keys −, + and 0, or Ctrl/⌘ + scroll).
-  - **Hand** (H): drag to move around a zoomed board. You can also hold Space and drag, or drag with the middle mouse button.
-  - **Meeting mode:** hides everything except the board and its tools. Press Esc to leave.
+- **During a meeting:**
+  - **Meeting mode:** the board fills the window, and plain scrolling moves around it. Press Esc to leave.
   - **Full screen:** meeting mode with the browser's full screen. Good for screen sharing.
-  - Extract sends only the part of the board you drew on, so big boards still read well.
+  - Extract sends only the part of the board you drew on, so a spread-out drawing still reads well.
 - **Extract schema**, then check anything highlighted in amber. Editing a field or pressing **Looks right** clears its flag.
+- **Draft schema** has two views:
+  - **Editor:** edit tables and columns, and check flags.
+  - **Diagram:** the draft as table cards with relationship lines, like dbdiagram.io. `*` marks the column holding the reference and `1` the column it points to; key icons mark primary keys and amber marks columns to check. Drag tables to move them (positions are saved with the project), drag the background to move around, Ctrl/⌘ + scroll to zoom, **Arrange** to lay everything out again, and double-click a table to edit it. **SVG** and **PNG** download the diagram.
 - Copy **PostgreSQL DDL** or **DBML** from Export.
 
 Typed text in Draw mode is much easier for the models to read than mouse handwriting, so prefer the Text tool for names.
@@ -118,8 +122,8 @@ js/
     chat-completions.js     request format shared by OpenAI and DeepSeek
     openrouter.js  gemini.js  openai.js  anthropic.js  deepseek.js
   sketch/
-    board.js                the canvas: Photo/Draw mode, zoom, board size, meeting mode, upload, image sent to the model
-    draw-tools.js           drawing tools, text boxes, undo/clear, keyboard shortcuts
+    board.js                the canvas: Photo/Draw mode, the open-ended board (pan/zoom), meeting mode, upload, image sent to the model
+    draw-tools.js           drawing tools, text boxes, auto-scroll at edges, pinch, undo/clear, keyboard shortcuts
     shapes.js               drawing and hit-testing shapes; checking saved drawings
     image.js                canvas/photo → JPEG (for sending, saving and previews)
     example.js              the example whiteboard and its draft
@@ -128,6 +132,9 @@ js/
     export.js               draft → PostgreSQL DDL and DBML
     editor.js               the draft editor UI
     export-panel.js         the Export panel (tabs, Copy)
+  diagram/
+    layout.js               card sizes, relationships, auto-arrange, connector paths (pure, tested)
+    diagram.js              the Diagram view: drawing, dragging, zoom, SVG/PNG download
   projects/
     db.js                   IndexedDB storage
     projects.js             autosave, project bar, Projects list, import/export
@@ -138,7 +145,7 @@ tests/                      node --test unit tests for the pure logic
 
 - **Shared state lives in `js/state.js`.** Modules read and change `state` there instead of keeping their own copies.
 - **Modules announce changes with events** instead of calling each other. For example, the editor emits `draft:edited` after a field changes; the export panel listens and refreshes, and the projects module listens for `dirty` and autosaves.
-- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js` and `sketch/shapes.js` never touch the page, which is why they can be tested with plain Node.
+- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js` and `diagram/layout.js` never touch the page, which is why they can be tested with plain Node.
 
 ### Common changes
 
@@ -146,4 +153,5 @@ tests/                      node --test unit tests for the pure logic
 - **Change default models or hints:** edit that provider's file.
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
-- **Change colors or fonts:** edit `css/tokens.css`.
+- **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.
+- **Change how the diagram looks or is arranged:** card drawing is in `js/diagram/diagram.js`; sizes, arrangement and line routing are in `js/diagram/layout.js` (with tests in `tests/diagram.test.js`).

@@ -1,18 +1,18 @@
 // Projects: autosave, the project bar (name, New, Export, Import) and the Projects list.
-import { $, esc, store, showMsg } from "../util.js";
+import { $, esc, store, showMsg, slug } from "../util.js";
 import { state, on, emit, EXAMPLE_PHOTO_NAME } from "../state.js";
 import { DB } from "./db.js";
 import { cleanDraft, fromModel, snapshotOf } from "../schema/model.js";
 import { cleanShapes } from "../sketch/shapes.js";
-import { cv, view, setMode, syncBoardControls } from "../sketch/board.js";
-import { thumbnail, loadImage } from "../sketch/image.js";
+import { setMode, syncBoardControls, boardThumbnail } from "../sketch/board.js";
+import { loadImage } from "../sketch/image.js";
+import { cleanPositions } from "../diagram/layout.js";
 import { EXAMPLE_DRAFT } from "../sketch/example.js";
 import { svgIcon } from "../icons.js";
 
 let loading = false, saveTimer = null, dbReady = false;
 const dlg = $("#projDialog");
 const newId = () => "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const num = (v) => typeof v === "number" && isFinite(v);
 
 function relTime(ts) {
   const d = (Date.now() - ts) / 1000;
@@ -37,9 +37,10 @@ function currentRecord() {
   return {
     ...state.project, name: $("#projName").value.trim() || "Untitled project", updatedAt: Date.now(),
     mode: state.mode, photo: state.photo.data, photoName: state.photo.data ? state.photo.name : null,
-    drawing: { shapes: state.shapes, boardW: state.boardW, boardH: state.boardH },
+    drawing: { shapes: state.shapes },
     draft: { tables: state.schema.tables, warnings: state.schema.warnings }, original: state.original,
-    tableCount: state.schema.tables.length, thumb: thumbnail(cv)
+    diagram: { pos: state.diagram.pos },
+    tableCount: state.schema.tables.length, thumb: boardThumbnail()
   };
 }
 
@@ -72,8 +73,8 @@ addEventListener("pagehide", () => { if (saveTimer) saveNow(); });
 function blankProject(name) {
   const now = Date.now();
   return { id: newId(), name, createdAt: now, updatedAt: now, mode: "draw", photo: null, photoName: null,
-    drawing: { shapes: [], boardW: state.boardW, boardH: state.boardH }, draft: { tables: [], warnings: [] },
-    original: {}, tableCount: 0, thumb: null };
+    drawing: { shapes: [] }, draft: { tables: [], warnings: [] },
+    original: {}, diagram: { pos: {} }, tableCount: 0, thumb: null };
 }
 
 async function uniqueName(base) {
@@ -89,17 +90,15 @@ async function loadProject(p) {
     state.project = p;
     $("#projName").value = p.name || "Untitled project";
     state.shapes = cleanShapes(p.drawing?.shapes);
-    const d = p.drawing || {};
-    if (num(d.boardW) && num(d.boardH) && d.boardW >= 600 && d.boardH >= 400) { state.boardW = d.boardW; state.boardH = d.boardH; }
     syncBoardControls();
     const photoData = typeof p.photo === "string" && /^data:image\/(jpeg|png|webp|gif);base64,/.test(p.photo) ? p.photo : null;
     const img = photoData ? await loadImage(photoData).catch(() => null) : null;
     state.photo = img ? { img, data: photoData, name: p.photoName || "Saved photo" } : { img: null, data: null, name: EXAMPLE_PHOTO_NAME };
     state.schema = { tables: cleanDraft(p.draft?.tables), warnings: (Array.isArray(p.draft?.warnings) ? p.draft.warnings : []).map(String) };
     state.original = p.original && typeof p.original === "object" ? p.original : {};
+    state.diagram = { pos: cleanPositions(p.diagram?.pos) };
     emit("project:loaded");
     emit("draft:replaced");
-    view.zoom = "fit";
     setMode(p.mode === "draw" ? "draw" : "photo");
     showMsg("");
     store.set("s2s.currentProject", p.id);
@@ -121,7 +120,6 @@ $("#newProj").addEventListener("click", async () => {
   $("#projName").focus(); $("#projName").select();
 });
 
-const slug = (t) => (t || "project").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
 function exportProject(rec) {
   const { thumb, ...rest } = rec;
   const blob = new Blob([JSON.stringify({ format: "sketch-to-schema", version: 1, exportedAt: new Date().toISOString(), project: rest })], { type: "application/json" });
@@ -152,7 +150,8 @@ $("#importFile").addEventListener("change", async (e) => {
   const np = {
     ...blankProject(await uniqueName(String(ip.name || "Imported project").slice(0, 120))),
     mode: ip.mode === "draw" ? "draw" : "photo", photo: ip.photo, photoName: ip.photoName ? String(ip.photoName) : null,
-    drawing: { shapes: cleanShapes(ip.drawing?.shapes), boardW: ip.drawing?.boardW, boardH: ip.drawing?.boardH },
+    drawing: { shapes: cleanShapes(ip.drawing?.shapes) },
+    diagram: { pos: cleanPositions(ip.diagram?.pos) },
     draft: { tables: cleanDraft(ip.draft?.tables), warnings: (Array.isArray(ip.draft?.warnings) ? ip.draft.warnings : []).map(String) },
     original: ip.original && typeof ip.original === "object" ? ip.original : {}, createdAt: now, updatedAt: now
   };

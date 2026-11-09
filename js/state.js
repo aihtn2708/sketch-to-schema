@@ -15,10 +15,10 @@ export const state = {
   schema: { tables: [], warnings: [] },  // the draft: tables with columns, flags and references
   original: {},                            // the draft as first extracted, for the "kept as extracted" figure
   mode: "photo",                           // "photo" or "draw"
-  shapes: [],                              // the drawing on the board
-  boardW: 1200, boardH: 760,               // drawing board size, in canvas pixels
+  shapes: [],                              // the drawing, in world coordinates (the board has no edges)
   textSize: 30,                            // size of new text on the board
   photo: { img: null, data: null, name: EXAMPLE_PHOTO_NAME },  // img null = show the example whiteboard
+  diagram: { pos: {} },                    // Diagram view: table positions, by table id
   project: null                            // the open project record
 };
 

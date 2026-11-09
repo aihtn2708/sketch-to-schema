@@ -91,12 +91,6 @@
           <button type="button" class="tool" id="clearBtn" data-icon="trash" title="Remove everything from the board"><span class="lbl">Clear</span></button>
         </div>
         <div class="viewbar" id="viewBar" hidden>
-          <label for="boardSize">Board</label>
-          <select class="in" id="boardSize">
-            <option value="1200x760">Standard</option>
-            <option value="1800x1100">Wide</option>
-            <option value="2600x1600">Large</option>
-          </select>
           <label for="textSize">Text</label>
           <select class="in" id="textSize">
             <option value="24">Small</option>
@@ -107,14 +101,14 @@
           <button type="button" class="tool" id="zoomOut" data-icon="zoomOut" aria-label="Zoom out" title="Zoom out (−, or Ctrl + scroll)"></button>
           <span class="zoom-val" id="zoomVal" aria-live="polite">Fit</span>
           <button type="button" class="tool" id="zoomIn" data-icon="zoomIn" aria-label="Zoom in" title="Zoom in (+, or Ctrl + scroll)"></button>
-          <button type="button" class="tool" id="zoomFit" data-icon="fit" title="Fit the board to the window (0)"><span class="lbl">Fit</span></button>
+          <button type="button" class="tool" id="zoomFit" data-icon="fit" title="Show the whole drawing (0)"><span class="lbl">Fit</span></button>
           <span class="sep" aria-hidden="true"></span>
           <button type="button" class="tool" id="meetingBtn" data-icon="meeting" aria-pressed="false" title="Hide everything but the board (Esc to leave)"><span class="lbl">Meeting mode</span></button>
           <button type="button" class="tool" id="fsBtn" data-icon="fullscreen" title="Full screen"><span class="lbl">Full screen</span></button>
         </div>
         <div class="board" id="board">
           <canvas id="sketch" width="1200" height="760" aria-label="The sketch being read"></canvas>
-          <p class="board-hint" id="drawHint" hidden>Draw a box for each table, type its name and columns inside with Text (underline a key with Pen), then link tables with “1 → many”.</p>
+          <p class="board-hint" id="drawHint" hidden>Draw a box for each table, type its name and columns inside with Text (underline a key with Pen), then link tables with “1 → many”. The board has no edges: drag past one and it moves with you.</p>
           <div class="busy" id="busy" hidden>
             <div class="busy-card">
               <div class="scan" aria-hidden="true"></div>
@@ -138,12 +132,35 @@
     <section class="panel" id="draftPanel" aria-labelledby="draftTitle">
       <div class="panel-head">
         <h2 id="draftTitle">Draft schema</h2>
+        <div class="seg" role="tablist" aria-label="Draft view">
+          <button type="button" role="tab" id="viewEditor" aria-selected="true">Editor</button>
+          <button type="button" role="tab" id="viewDiagram" aria-selected="false">Diagram</button>
+        </div>
         <div class="summary" id="summary"></div>
       </div>
       <div class="panel-body">
         <ul class="warnings" id="warnings" hidden></ul>
-        <div id="tables" style="display:grid;gap:14px"></div>
-        <div><button type="button" id="addTable">Add table</button></div>
+        <div class="editor-view" id="editorView">
+          <div id="tables" style="display:grid;gap:14px"></div>
+          <div><button type="button" id="addTable">Add table</button></div>
+        </div>
+        <div class="diagram-view" id="diagramView" hidden>
+          <div class="toolbar" role="toolbar" aria-label="Diagram tools">
+            <button type="button" class="tool" id="dgArrange" data-icon="layout" title="Lay the tables out automatically"><span class="lbl">Arrange</span></button>
+            <button type="button" class="tool" id="dgFit" data-icon="fit" title="Show the whole diagram"><span class="lbl">Fit</span></button>
+            <button type="button" class="tool" id="dgZoomOut" data-icon="zoomOut" aria-label="Zoom out" title="Zoom out (Ctrl + scroll)"></button>
+            <span class="zoom-val" id="dgZoomVal" aria-live="polite">100%</span>
+            <button type="button" class="tool" id="dgZoomIn" data-icon="zoomIn" aria-label="Zoom in" title="Zoom in (Ctrl + scroll)"></button>
+            <span class="sep" aria-hidden="true"></span>
+            <button type="button" class="tool" id="dgSvg" data-icon="download" title="Download the diagram as an SVG file"><span class="lbl">SVG</span></button>
+            <button type="button" class="tool" id="dgPng" data-icon="image" title="Download the diagram as a PNG image"><span class="lbl">PNG</span></button>
+          </div>
+          <div class="dg-wrap" id="dgWrap">
+            <svg id="diagramSvg" role="img" aria-label="Diagram of the draft schema"></svg>
+            <p class="empty dg-empty" id="dgEmpty" hidden>No tables yet. Extract them from a sketch, or add a table in the Editor.</p>
+          </div>
+          <p class="hint">Drag tables to move them, drag the background to move around, Ctrl/⌘ + scroll to zoom. Double-click a table to edit it. * marks the column holding the reference, 1 the column it points to.</p>
+        </div>
       </div>
     </section>
 

@@ -128,7 +128,21 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 .viewbar select { width: auto; padding: 5px 8px; font-size: 13px; }
 .viewbar .sep, .toolbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
 .zoom-val { min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink); }
-.board.drawing { overflow: auto; max-height: min(75vh, 900px); overscroll-behavior: contain; }
-.board.drawing canvas { max-width: none; margin: 0 auto; }
+.board.drawing { height: min(68vh, 640px); min-height: 320px; overflow: hidden; overscroll-behavior: contain; }
+.board.drawing canvas { position: absolute; inset: 0; max-width: none; touch-action: none; }
 .board.drawing.t-pan canvas { cursor: grab; }
 .board.drawing.panning canvas { cursor: grabbing; }
+
+/* Draft: Editor | Diagram */
+.editor-view, .diagram-view { display: grid; gap: 14px; min-width: 0; }
+.diagram-view { gap: 10px; }
+.dg-wrap {
+  position: relative; height: min(68vh, 640px); min-height: 320px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--r); background-color: var(--sunk);
+  background-image: radial-gradient(color-mix(in srgb, var(--muted) 38%, transparent) 1px, transparent 1.3px);
+  background-size: 20px 20px; touch-action: none; cursor: grab; user-select: none;
+}
+.dg-wrap.panning { cursor: grabbing; }
+.dg-wrap svg { display: block; width: 100%; height: 100%; }
+.dg-table { cursor: move; }
+.dg-empty { position: absolute; inset: 50% 16px auto; transform: translateY(-50%); border: 0; }

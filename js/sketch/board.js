@@ -1,29 +1,32 @@
 // The sketch board: one canvas that shows either a photo (Photo mode) or the drawing (Draw mode).
-// Also: zoom, board size, meeting mode, full screen, photo upload/drop/paste, and the image sent for extraction.
+// In Draw mode the board is an open-ended space: shapes live in "world" coordinates, and the
+// view (pan + zoom) decides which part is on screen. Also: meeting mode, full screen,
+// photo upload/drop/paste, and the image sent for extraction.
 import { $, store, showMsg } from "../util.js";
 import { state, emit, EXAMPLE_PHOTO_NAME } from "../state.js";
-import { paintShape, strokeScale, shapesBounds } from "./shapes.js";
+import { paintShape, shapesBounds } from "./shapes.js";
 import { drawExample } from "./example.js";
-import { encodeRegion, imageToJpeg, loadImage } from "./image.js";
+import { encodeRegion, imageToJpeg, loadImage, thumbnail } from "./image.js";
 import { setLabel } from "../icons.js";
 
 export const cv = $("#sketch");
 export const cx = cv.getContext("2d");
 export const board = $("#board");
 
-// View-only state (not saved): the shape being drawn right now, and the zoom level.
-export const view = { drag: null, zoom: "fit" };
+// View-only state (not saved). Screen position = world position × k + (x, y), in CSS pixels.
+export const view = { drag: null, x: 0, y: 0, k: 1, needsFit: true };
+const MIN_K = 0.1, MAX_K = 4;
+let dpr = 1, cssW = 0, cssH = 0;
 
-// This browser's last board and text size, used for new projects.
+// This browser's last text size, used for new text.
 (() => {
-  const [w, h] = (store.get("s2s.boardSize") || "").split("x").map(Number);
-  if (w >= 600 && h >= 400) { state.boardW = w; state.boardH = h; }
   const ts = Number(store.get("s2s.textSize"));
   if ([24, 30, 40].includes(ts)) state.textSize = ts;
 })();
 
 /* ---------- Painting ---------- */
 function drawPhoto() {
+  cv.style.width = ""; cv.style.height = "";
   const img = state.photo.img;
   if (!img) { drawExample(cv, cx); return; }
   const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
@@ -31,97 +34,121 @@ function drawPhoto() {
   cx.drawImage(img, 0, 0, cv.width, cv.height);
 }
 
-export function drawBoard(withGrid = true) {
-  cv.width = state.boardW; cv.height = state.boardH;
-  cx.fillStyle = "#fbfbf9"; cx.fillRect(0, 0, cv.width, cv.height);
-  if (withGrid) {
-    cx.fillStyle = "rgba(60,80,75,0.16)";
-    for (let gx = 20; gx < cv.width; gx += 40) for (let gy = 20; gy < cv.height; gy += 40) cx.fillRect(gx - 1, gy - 1, 2, 2);
+// Match the canvas to the board's size on screen (only reallocates when the size changes).
+function fitCanvasToBoard() {
+  const w = board.clientWidth, h = board.clientHeight, r = window.devicePixelRatio || 1;
+  if (w === cssW && h === cssH && r === dpr) return;
+  cssW = w; cssH = h; dpr = r;
+  cv.width = Math.max(1, Math.round(w * r)); cv.height = Math.max(1, Math.round(h * r));
+  cv.style.width = w + "px"; cv.style.height = h + "px";
+}
+
+export function drawBoard() {
+  if (state.mode !== "draw") return;
+  fitCanvasToBoard();
+  if (!cssW || !cssH) return;              // not visible yet
+  if (view.needsFit) { view.needsFit = false; fitView(false); }
+  const { x, y, k } = view;
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx.fillStyle = "#fbfbf9"; cx.fillRect(0, 0, cssW, cssH);
+  // Dot grid every 40 world units, thinned out when zoomed far out.
+  let g = 40;
+  while (g * k < 16) g *= 2;
+  cx.fillStyle = "rgba(60,80,75,0.18)";
+  const gx0 = Math.floor(-x / k / g) * g, gy0 = Math.floor(-y / k / g) * g;
+  for (let gx = gx0; gx * k + x < cssW; gx += g) {
+    for (let gy = gy0; gy * k + y < cssH; gy += g) cx.fillRect(gx * k + x - 1, gy * k + y - 1, 2, 2);
   }
-  const sf = strokeScale(state.boardW);
-  for (const s of state.shapes) paintShape(cx, s, sf);
-  if (view.drag) paintShape(cx, view.drag, sf);
-  $("#drawHint").hidden = state.mode !== "draw" || state.shapes.length > 0 || !!view.drag;
+  cx.setTransform(dpr * k, 0, 0, dpr * k, dpr * x, dpr * y);
+  for (const s of state.shapes) paintShape(cx, s);
+  if (view.drag) paintShape(cx, view.drag);
+  cx.setTransform(1, 0, 0, 1, 0, 0);
+  $("#drawHint").hidden = state.shapes.length > 0 || !!view.drag;
+  $("#zoomVal").textContent = `${Math.round(k * 100)}%`;
 }
 
 export function redraw() {
-  if (state.mode === "draw") drawBoard(true); else drawPhoto();
-  applyZoom();
+  if (state.mode === "draw") drawBoard(); else drawPhoto();
 }
 
-// Canvas pixel position of a pointer event.
-export function toCanvas(e) {
-  const r = cv.getBoundingClientRect();
-  return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height];
-}
+// Redraw when the board changes size (window resize, meeting mode, full screen).
+new ResizeObserver(() => { if (state.mode === "draw") drawBoard(); }).observe(board);
 
-/* ---------- Zoom ---------- */
-const ZOOM_STEPS = [0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3];
+/* ---------- Coordinates ---------- */
+// Pointer position on the board, in CSS pixels.
+export function toScreen(e) {
+  const r = board.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+// Pointer position in world coordinates.
+export function toWorld(e) {
+  const [sx, sy] = toScreen(e);
+  return [(sx - view.x) / view.k, (sy - view.y) / view.k];
+}
+export const boardSize = () => [cssW, cssH];
+
+/* ---------- Pan and zoom ---------- */
 export const inMeeting = () => document.body.classList.contains("meeting");
 
-function fitZoom() {
-  const availW = Math.max(100, board.clientWidth - 2);
-  const availH = inMeeting() ? Math.max(100, board.clientHeight - 2) : Infinity;
-  return Math.min(availW / state.boardW, availH / state.boardH);
-}
-const currentZoom = () => (view.zoom === "fit" ? fitZoom() : view.zoom);
-
-export function applyZoom() {
-  if (state.mode !== "draw") { cv.style.width = ""; return; }
-  const z = currentZoom();
-  cv.style.width = Math.round(state.boardW * z) + "px";
-  $("#zoomVal").textContent = view.zoom === "fit" ? `Fit · ${Math.round(z * 100)}%` : `${Math.round(z * 100)}%`;
+export function panBy(dx, dy) {
+  view.x += dx; view.y += dy;
+  drawBoard();
 }
 
-export function setZoom(z) {
-  // Keep the point at the middle of the view in place while zooming.
-  const rx = (board.scrollLeft + board.clientWidth / 2) / Math.max(1, cv.offsetWidth);
-  const ry = (board.scrollTop + board.clientHeight / 2) / Math.max(1, cv.offsetHeight);
-  view.zoom = z; applyZoom();
-  board.scrollLeft = rx * cv.offsetWidth - board.clientWidth / 2;
-  board.scrollTop = ry * cv.offsetHeight - board.clientHeight / 2;
+// Zoom to k, keeping the world point under (sx, sy) in place (default: the middle of the board).
+export function setZoom(k, sx = cssW / 2, sy = cssH / 2) {
+  emit("text:commit");
+  const nk = Math.min(MAX_K, Math.max(MIN_K, k));
+  const wx = (sx - view.x) / view.k, wy = (sy - view.y) / view.k;
+  view.k = nk; view.x = sx - wx * nk; view.y = sy - wy * nk;
+  drawBoard();
 }
 
+const ZOOM_STEPS = [0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4];
 export function stepZoom(dir) {
-  const z = currentZoom();
-  const next = dir > 0 ? ZOOM_STEPS.find((s) => s > z + 0.001) : [...ZOOM_STEPS].reverse().find((s) => s < z - 0.001);
+  const k = view.k;
+  const next = dir > 0 ? ZOOM_STEPS.find((s) => s > k + 0.001) : [...ZOOM_STEPS].reverse().find((s) => s < k - 0.001);
   if (next) setZoom(next);
+}
+
+// Show the whole drawing (or a fresh area at 100% when the board is empty).
+export function fitView(draw = true) {
+  emit("text:commit");
+  const b = contentBounds();
+  if (!b || !cssW) { view.k = 1; view.x = 40; view.y = 40; }
+  else {
+    const m = 40, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+    const k = Math.min(MAX_K, Math.max(MIN_K, Math.min((cssW - 2 * m) / Math.max(bw, 1), (cssH - 2 * m) / Math.max(bh, 1), 1.25)));
+    view.k = k;
+    view.x = (cssW - bw * k) / 2 - b.x0 * k;
+    view.y = (cssH - bh * k) / 2 - b.y0 * k;
+  }
+  if (draw) drawBoard();
 }
 
 $("#zoomIn").addEventListener("click", () => stepZoom(1));
 $("#zoomOut").addEventListener("click", () => stepZoom(-1));
-$("#zoomFit").addEventListener("click", () => setZoom("fit"));
-board.addEventListener("wheel", (e) => {
-  if (state.mode !== "draw" || !(e.ctrlKey || e.metaKey)) return;
-  e.preventDefault(); stepZoom(e.deltaY < 0 ? 1 : -1);
-}, { passive: false });
-addEventListener("resize", () => applyZoom());
+$("#zoomFit").addEventListener("click", () => fitView());
 
-/* ---------- Board and text size ---------- */
+// Ctrl/⌘ + scroll (and trackpad pinch) zooms at the pointer. In meeting mode, plain scrolling
+// moves around the board; elsewhere it scrolls the page as usual.
+board.addEventListener("wheel", (e) => {
+  if (state.mode !== "draw") return;
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    const [sx, sy] = toScreen(e);
+    setZoom(view.k * Math.exp(-e.deltaY * 0.0025), sx, sy);
+  } else if (inMeeting()) {
+    e.preventDefault();
+    emit("text:commit");
+    panBy(-e.deltaX, -e.deltaY);
+  }
+}, { passive: false });
+
+/* ---------- Text size ---------- */
 export const contentBounds = () => shapesBounds(cx, state.shapes);
 
-// Put the selects in line with state (after a project opens).
-export function syncBoardControls() {
-  $("#boardSize").value = `${state.boardW}x${state.boardH}`;
-  if ($("#boardSize").value !== `${state.boardW}x${state.boardH}`) {   // not one of the sizes offered
-    state.boardW = 1200; state.boardH = 760; $("#boardSize").value = "1200x760";
-  }
-  $("#textSize").value = String(state.textSize);
-}
-
-$("#boardSize").addEventListener("change", (e) => {
-  const [w, h] = e.target.value.split("x").map(Number);
-  const b = contentBounds();
-  if (b && (b.x1 > w || b.y1 > h)) {
-    showMsg("Your drawing doesn't fit on that board. Pick a bigger size, or move or erase shapes near the right and bottom edges first.", true);
-    e.target.value = `${state.boardW}x${state.boardH}`;
-    return;
-  }
-  state.boardW = w; state.boardH = h; store.set("s2s.boardSize", e.target.value);
-  const suggested = w >= 2600 ? 40 : w >= 1800 ? 30 : state.textSize;   // keep text readable at Fit
-  if (suggested > state.textSize) { state.textSize = suggested; $("#textSize").value = String(suggested); store.set("s2s.textSize", String(suggested)); }
-  view.zoom = "fit"; drawBoard(); applyZoom(); showMsg(""); emit("dirty");
-});
+export function syncBoardControls() { $("#textSize").value = String(state.textSize); }
 $("#textSize").addEventListener("change", (e) => { state.textSize = Number(e.target.value); store.set("s2s.textSize", e.target.value); });
 
 /* ---------- Meeting mode and full screen ---------- */
@@ -132,8 +159,6 @@ export function setMeeting(on) {
   $("#meetingBtn").setAttribute("aria-pressed", on);
   setLabel("#meetingBtn", on ? "Exit meeting mode" : "Meeting mode");
   if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-  if (on) view.zoom = "fit";
-  requestAnimationFrame(applyZoom);
 }
 $("#meetingBtn").addEventListener("click", () => setMeeting(!inMeeting()));
 if (!document.fullscreenEnabled) $("#fsBtn").hidden = true;
@@ -144,7 +169,6 @@ $("#fsBtn").addEventListener("click", () => {
 });
 document.addEventListener("fullscreenchange", () => {
   setLabel("#fsBtn", document.fullscreenElement ? "Exit full screen" : "Full screen");
-  requestAnimationFrame(applyZoom);
 });
 
 /* ---------- Photo / Draw mode ---------- */
@@ -161,6 +185,7 @@ export function setMode(m) {
   $("#sourceName").textContent = m === "draw" ? "Your drawing" : state.photo.name;
   $("#sourceTip").textContent = m === "draw" ? "Saved with the project as you draw" : "Drop or paste an image here too";
   $("#drawHint").hidden = m !== "draw" || state.shapes.length > 0;
+  cssW = cssH = 0;                          // the canvas changes role, so re-measure
   redraw();
   emit("dirty");
 }
@@ -194,21 +219,29 @@ $("#useExample").addEventListener("click", () => {
   setMode("photo"); showMsg("");
 });
 
-/* ---------- The image sent to the model ---------- */
-// Photo: the whole image. Drawing: only the area drawn on (plus a margin) and without the dot grid,
-// so a large board doesn't shrink the text before the model reads it.
+/* ---------- Images of the drawing ---------- */
+// The drawn area (plus a margin) on white, at most maxEdge pixels on its long side.
+function renderDrawing(maxEdge, quality) {
+  const b = contentBounds() || { x0: 0, y0: 0, x1: 600, y1: 380 };
+  const m = 40, w = b.x1 - b.x0 + 2 * m, h = b.y1 - b.y0 + 2 * m;
+  const scale = Math.min(1, maxEdge / Math.max(w, h));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
+  g.setTransform(scale, 0, 0, scale, (m - b.x0) * scale, (m - b.y0) * scale);
+  for (const s of state.shapes) paintShape(g, s);
+  return c.toDataURL("image/jpeg", quality);
+}
+
+// The image sent to the model: the whole photo, or only the part of the board that was drawn on
+// (so a spread-out drawing isn't shrunk before the model reads it).
 export function sketchImage() {
-  let rect = { x: 0, y: 0, w: cv.width, h: cv.height };
-  if (state.mode === "draw") {
-    drawBoard(false);
-    const b = contentBounds();
-    if (b) {
-      const m = 40;
-      const x = Math.max(0, Math.floor(b.x0 - m)), y = Math.max(0, Math.floor(b.y0 - m));
-      rect = { x, y, w: Math.min(cv.width, Math.ceil(b.x1 + m)) - x, h: Math.min(cv.height, Math.ceil(b.y1 + m)) - y };
-    }
-  }
-  const dataUrl = encodeRegion(cv, rect, 1300);
-  if (state.mode === "draw") drawBoard(true);
-  return dataUrl;
+  if (state.mode === "draw") return renderDrawing(1300, 0.88);
+  return encodeRegion(cv, { x: 0, y: 0, w: cv.width, h: cv.height }, 1300);
+}
+
+// Preview for the Projects list.
+export function boardThumbnail() {
+  return state.mode === "draw" ? renderDrawing(240, 0.7) : thumbnail(cv);
 }
