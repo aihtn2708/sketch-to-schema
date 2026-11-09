@@ -1,0 +1,28 @@
+/* Design tokens: colors (light and dark), fonts, base page styles. Change the look here. */
+:root {
+  --bg: #eef2f0; --surface: #ffffff; --sunk: #f5f8f6; --ink: #16201d; --muted: #586a64; --line: #d3dcd8;
+  --accent: #0d6e66; --accent-ink: #ffffff; --accent-soft: #dcefeb;
+  --check: #9a4f06; --check-bg: #fbf0df; --check-line: #e8c48f; --danger: #a3261b;
+  --font-ui: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 8px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1513; --surface: #161f1c; --sunk: #111917; --ink: #e2eae7; --muted: #94a59f;
+    --line: #2b3834; --accent: #46c2b2; --accent-ink: #062520; --accent-soft: #163a35;
+    --check: #f1aa55; --check-bg: #2c2217; --check-line: #5e4526; --danger: #f08a7e;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+[hidden] { display: none !important; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

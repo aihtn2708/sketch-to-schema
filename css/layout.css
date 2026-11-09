@@ -1,0 +1,35 @@
+/* Page layout: header, panels, the two-column workbench, project bar and meeting mode. */
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+h1 { font-size: clamp(26px, 3.2vw, 34px); line-height: 1.1; margin: 0; letter-spacing: -0.01em; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.panel-body { padding: 16px 18px; display: grid; gap: 14px; }
+
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "sketch draft" "out draft"; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch" "draft" "out"; } }
+#sketchPanel { grid-area: sketch; } #draftPanel { grid-area: draft; } #outPanel { grid-area: out; }
+
+/* Project bar */
+.projbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
+.proj-icon { display: inline-flex; color: var(--accent); flex: none; }
+.proj-icon svg { width: 20px; height: 20px; }
+.proj-name { font-weight: 600; font-size: 16px; flex: 1 1 220px; min-width: 0; border-color: transparent; background: transparent; }
+.proj-name:hover, .proj-name:focus { border-color: var(--line); background: var(--surface); }
+.save-state { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.save-state.err { color: var(--danger); white-space: normal; }
+button svg, .btn svg { width: 18px; height: 18px; flex: none; }
+body.meeting #projBar { display: none; }
+
+/* Meeting mode: the board takes the whole window */
+body.meeting { padding-block: 8px; }
+body.meeting header, body.meeting #connPanel, body.meeting #draftPanel, body.meeting #outPanel,
+body.meeting .source, body.meeting .privacy-note { display: none; }
+body.meeting .wrap { max-width: none; }
+body.meeting .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch"; }
+body.meeting #sketchPanel { height: calc(100vh - 16px); height: calc(100dvh - 16px); display: flex; flex-direction: column; }
+body.meeting #sketchPanel > .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding-block: 10px; }
+body.meeting .board.drawing { flex: 1; min-height: 0; max-height: none; }
