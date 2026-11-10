@@ -18,8 +18,11 @@ test("validShape accepts the expected shape and rejects others", () => {
   assert.equal(validShape(null), false);
 });
 
-test("the prompt's example matches the JSON schema's required keys", () => {
+test("the prompt's example only uses keys the JSON schema knows", () => {
   const example = JSON.parse(PROMPT.split("\n").find((l) => l.startsWith('{"tables"')));
-  const colKeys = SCHEMA.properties.tables.items.properties.cols.items.required;
-  for (const col of example.tables[0].cols) assert.deepEqual(Object.keys(col).sort(), [...colKeys].sort());
+  const colKeys = Object.keys(SCHEMA.properties.tables.items.properties.cols.items.properties);
+  for (const col of example.tables[0].cols) {
+    for (const k of Object.keys(col)) assert.ok(colKeys.includes(k), k);
+    assert.equal(typeof col.n, "string"); assert.equal(typeof col.t, "string");
+  }
 });

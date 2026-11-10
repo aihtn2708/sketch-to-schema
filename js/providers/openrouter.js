@@ -1,7 +1,36 @@
 // OpenRouter: free models, tried in order until one gives a usable reply.
-import { PROMPT, parseJson, validShape } from "./prompt.js";
-import { apiError } from "./http.js";
+import { runPasses } from "./passes.js";
+import { postJson, apiError, ProviderError, without, capTokens } from "./http.js";
 import { link } from "../util.js";
+
+async function request(key, dataUrl, prompt, model, signal) {
+  let res;
+  try {
+    res = await postJson("https://openrouter.ai/api/v1/chat/completions", {
+      Authorization: `Bearer ${key}`, "HTTP-Referer": location.origin, "X-Title": "Sketch to Schema"
+    }, {
+      model, max_tokens: 16000, temperature: 0,
+      // Reasoning counts toward max_tokens; keep it low so the reply has room.
+      reasoning: { effort: "low" },
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }]
+    }, { signal, fallbacks: [without("reasoning", /reason|effort/i), capTokens("max_tokens", 8000)] });
+  } catch (e) {
+    if (e?.name === "AbortError") throw e;
+    throw new ProviderError("Couldn't reach OpenRouter. Check your connection.");
+  }
+  if (res.status === 401) throw new ProviderError("OpenRouter rejected the key. Check it under AI connection.", { fatal: true });
+  if (res.status === 402) throw new ProviderError("Your OpenRouter balance is below zero, which blocks free models too. Add credit at openrouter.ai.", { fatal: true });
+  if (res.status === 429) {
+    const d = await apiError(res);
+    if (/per-day|per day|daily/i.test(d)) throw new ProviderError("You've used today's free requests on this OpenRouter account. They reset at 00:00 UTC.", { fatal: true });
+    throw new ProviderError("Free models are busy. Try again in a minute.");
+  }
+  if (!res.ok) throw new ProviderError((await apiError(res)) || `A model failed (${res.status}).`);
+  const msg = await res.json();
+  if (msg.error) throw new ProviderError(msg.error.message || "A model failed to answer.");
+  const choice = msg.choices?.[0];
+  return { text: choice?.message?.content || "", truncated: choice?.finish_reason === "length", model: msg.model || model };
+}
 
 export default {
   id: "openrouter",
@@ -17,37 +46,16 @@ export default {
 
   async extract(key, dataUrl, { model, signal, onStatus }) {
     const models = model.split(",").map((s) => s.trim()).filter(Boolean);
-    let last = "No model could read the sketch right now. Try again in a minute.";
+    let last = new ProviderError("No model could read the sketch right now. Try again in a minute.");
     for (const m of models) {
-      onStatus(`Reading the sketch with ${m}…`);
-      let res;
       try {
-        res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST", signal,
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": location.origin, "X-Title": "Sketch to Schema" },
-          body: JSON.stringify({ model: m, max_tokens: 4000, temperature: 0,
-            messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: dataUrl } }] }] })
-        });
+        // sticky: the free router picks a model per request, so later parts go to the one that answered.
+        return await runPasses((prompt, mm) => request(key, dataUrl, prompt, mm, signal), { model: m, onStatus, label: "The model", sticky: true });
       } catch (e) {
-        if (e?.name === "AbortError") throw e;
-        last = "Couldn't reach OpenRouter. Check your connection."; continue;
+        if (e?.name === "AbortError" || e?.fatal) throw e;
+        last = e;                                    // try the next model in the list
       }
-      if (res.status === 401) throw new Error("OpenRouter rejected the key. Check it under AI connection.");
-      if (res.status === 402) throw new Error("Your OpenRouter balance is below zero, which blocks free models too. Add credit at openrouter.ai.");
-      if (res.status === 429) {
-        const d = await apiError(res);
-        if (/per-day|per day|daily/i.test(d)) throw new Error("You've used today's free requests on this OpenRouter account. They reset at 00:00 UTC.");
-        last = "Free models are busy. Try again in a minute."; continue;
-      }
-      if (!res.ok) { last = (await apiError(res)) || `A model failed (${res.status}).`; continue; }
-      const msg = await res.json();
-      if (msg.error) { last = msg.error.message || "A model failed to answer."; continue; }
-      const choice = msg.choices?.[0];
-      if (choice?.finish_reason === "length") { last = "The diagram was too large for one pass. Crop it into parts."; continue; }
-      const parsed = parseJson(choice?.message?.content || "");
-      if (validShape(parsed)) return { result: parsed, model: msg.model || m };
-      last = "A model's reply couldn't be read. Try again.";
     }
-    throw new Error(last);
+    throw last;
   }
 };

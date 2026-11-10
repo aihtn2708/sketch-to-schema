@@ -117,8 +117,9 @@ js/
   extract.js                the Extract button: sketch → provider → draft
   providers/
     index.js                list of providers (the Provider menu is built from it)
-    prompt.js               the prompt, the reply's JSON shape, reply parsing
-    http.js                 shared request helpers
+    prompt.js               the prompt, the reply's JSON shape, reply parsing, rescuing cut-off replies
+    passes.js               reads large diagrams in several parts when a reply is cut off
+    http.js                 shared request helpers (retries without settings a model rejects)
     chat-completions.js     request format shared by OpenAI and DeepSeek
     openrouter.js  gemini.js  openai.js  anthropic.js  deepseek.js
   sketch/
@@ -151,6 +152,7 @@ tests/                      node --test unit tests for the pure logic
 
 - **Add an AI provider:** copy `js/providers/gemini.js` to a new file, change its fields and `extract()`, then add it to the list in `js/providers/index.js`. The Provider menu updates itself.
 - **Change default models or hints:** edit that provider's file.
+- **Large diagrams:** each request allows up to 16,000 reply tokens and asks the model to think as little as possible, since thinking uses the same reply space. If a reply is still cut off, the complete tables are kept and the model is asked for only the rest, up to 4 parts (`js/providers/passes.js`). If tables are still missing after that, a warning above the draft says so.
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
 - **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.

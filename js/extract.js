@@ -29,7 +29,8 @@ $("#extractBtn").addEventListener("click", async () => {
     state.original = snapshotOf(next.tables);
     emit("draft:replaced"); emit("dirty");
     const n = next.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
-    showMsg(`Drafted ${next.tables.length} tables with ${out.model}. ` +
+    const howRead = out.parts > 1 ? ` (read in ${out.parts} parts${out.incomplete ? "; some tables may be missing" : ""})` : "";
+    showMsg(`Drafted ${next.tables.length} tables with ${out.model}${howRead}. ` +
       (n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over.") +
       (inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""));
   } catch (e) {
