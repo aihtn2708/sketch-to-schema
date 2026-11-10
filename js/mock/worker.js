@@ -1,7 +1,7 @@
 // The mock database runs here, in a background worker, so a slow query never freezes the page
 // and Stop can end it. PostgreSQL itself is PGlite (WebAssembly), loaded on first use.
 //
-// Messages in:  { id, type: "build", url, steps: [{ sql, label, soft }], countSql }
+// Messages in:  { id, type: "build", steps: [{ sql, label, soft }], countSql }
 //               { id, type: "run", sql, maxRows }
 // Messages out: { id, ok: true, ...result } or { id, ok: false, error: { message, position, detail, hint, label } }
 import { digest, sortRows } from "./compare.js";
@@ -23,10 +23,13 @@ function fail(e, label) {
   return { message: e?.message || String(e), position: e?.position ? +e.position : null, detail: e?.detail || "", hint: e?.hint || "", label: label || "" };
 }
 
-async function build({ url, steps, countSql }) {
+// The engine only ever loads from this site's own copy (never from an address in a message).
+const ENGINE = new URL("../vendor/pglite/index.js", import.meta.url).href;
+
+async function build({ steps, countSql }) {
   let PGlite;
-  try { ({ PGlite } = await import(url)); }
-  catch { throw { message: "Couldn't download the database engine. Check your connection; some company networks block cdn.jsdelivr.net.", label: "load" }; }
+  try { ({ PGlite } = await import(ENGINE)); }
+  catch { throw { message: "Couldn't load the database engine. Check your connection and reload the page.", label: "load" }; }
   if (db) { try { await db.close(); } catch { /* already closed */ } }
   db = await PGlite.create();
   const warnings = [];

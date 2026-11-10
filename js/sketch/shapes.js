@@ -77,5 +77,7 @@ export function cleanShapes(list) {
     (s.type === "pen" && Array.isArray(s.pts) && s.pts.every((pt) => Array.isArray(pt) && num(pt[0]) && num(pt[1]))) ||
     (["box", "line", "many"].includes(s.type) && [s.x1, s.y1, s.x2, s.y2].every(num)) ||
     (s.type === "text" && typeof s.text === "string" && num(s.x) && num(s.y))
-  )).map((s) => (s.type === "text" ? { ...s, size: [24, 30, 40].includes(s.size) ? s.size : 30 } : s));
+  )).slice(0, 20000).map((s) => s.type === "text" ? { type: "text", x: s.x, y: s.y, text: s.text.slice(0, 500), size: [24, 30, 40].includes(s.size) ? s.size : 30 }
+    : s.type === "pen" ? { type: "pen", pts: s.pts.slice(0, 20000).map((pt) => [pt[0], pt[1]]) }
+    : { type: s.type, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 });
 }

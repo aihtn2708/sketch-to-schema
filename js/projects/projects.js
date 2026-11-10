@@ -1,8 +1,8 @@
 // Projects: autosave, the project bar (name, New, Export, Import) and the Projects list.
-import { $, esc, store, showMsg, slug } from "../util.js";
+import { $, esc, store, showMsg, slug, safeId } from "../util.js";
 import { state, on, emit, EXAMPLE_PHOTO_NAME } from "../state.js";
 import { DB } from "./db.js";
-import { cleanDraft, fromModel, snapshotOf } from "../schema/model.js";
+import { cleanDraft, cleanOriginal, fromModel, snapshotOf } from "../schema/model.js";
 import { cleanShapes } from "../sketch/shapes.js";
 import { setMode, syncBoardControls, boardThumbnail } from "../sketch/board.js";
 import { loadImage } from "../sketch/image.js";
@@ -33,8 +33,10 @@ function setSaveState(kind, detail) {
     : kind === "error" ? detail : "";
 }
 
+const MAX_IMPORT = 50 * 1024 * 1024;   // project files larger than this are refused
+
 // Collapsed tables in the editor: a list of table ids → { id: true }.
-const cleanCollapsed = (list) => Object.fromEntries((Array.isArray(list) ? list : []).filter((x) => typeof x === "string").slice(0, 2000).map((x) => [x, true]));
+const cleanCollapsed = (list) => Object.fromEntries((Array.isArray(list) ? list : []).filter((x) => typeof x === "string").slice(0, 2000).map((x) => [safeId(x), true]));
 
 /* ---------- Saving ---------- */
 // The open project as a record, from the current app state.
@@ -103,7 +105,7 @@ async function loadProject(p) {
     const img = photoData ? await loadImage(photoData).catch(() => null) : null;
     state.photo = img ? { img, data: photoData, name: p.photoName || "Saved photo" } : { img: null, data: null, name: EXAMPLE_PHOTO_NAME };
     state.schema = { tables: cleanDraft(p.draft?.tables), warnings: (Array.isArray(p.draft?.warnings) ? p.draft.warnings : []).map(String) };
-    state.original = p.original && typeof p.original === "object" ? p.original : {};
+    state.original = cleanOriginal(p.original);
     state.diagram = { pos: cleanPositions(p.diagram?.pos) };
     state.editor = { collapsed: cleanCollapsed(p.editor?.collapsed) };
     state.queries = cleanQueries(p.queries);
@@ -153,6 +155,7 @@ $("#importFile").addEventListener("change", async (e) => {
   const f = e.target.files[0];
   e.target.value = "";
   if (!f) return;
+  if (f.size > MAX_IMPORT) { showMsg(`That file is larger than ${MAX_IMPORT / 1024 / 1024} MB, so it wasn't imported.`, true); return; }
   let data;
   try { data = JSON.parse(await f.text()); } catch { data = null; }
   const ip = data?.project;
@@ -169,7 +172,7 @@ $("#importFile").addEventListener("change", async (e) => {
     queries: cleanQueries(ip.queries),
     mock: cleanMock(ip.mock),
     draft: { tables: cleanDraft(ip.draft?.tables), warnings: (Array.isArray(ip.draft?.warnings) ? ip.draft.warnings : []).map(String) },
-    original: ip.original && typeof ip.original === "object" ? ip.original : {}, createdAt: now, updatedAt: now
+    original: cleanOriginal(ip.original), createdAt: now, updatedAt: now
   };
   await loadProject(np);
   if (dbReady) await saveNow();

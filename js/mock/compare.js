@@ -1,6 +1,7 @@
 // SQL tests: a saved query plus the result it should give. Running a test re-runs the query
 // on the mock database and compares. Also used by the worker to fingerprint results.
 // Pure, covered by tests/mock.test.js.
+import { safeId } from "../util.js";
 
 export const SAMPLE_ROWS = 200;   // rows kept with a test, to show what changed
 
@@ -81,7 +82,7 @@ export function cleanTests(list) {
     const e = t?.expected;
     if (typeof t?.sql !== "string" || !t.sql.trim() || !e || !strs(e.columns) || !Number.isFinite(e.rowCount) || typeof e.hash !== "string" || !rowsOk(e.sample)) return null;
     return {
-      id: String(t.id || Math.random().toString(36).slice(2, 9)),
+      id: t.id ? safeId(t.id) : Math.random().toString(36).slice(2, 9),
       name: String(t.name || "Untitled test").slice(0, 200),
       sql: t.sql.slice(0, 20000),
       dataKey: typeof t.dataKey === "string" ? t.dataKey : "",

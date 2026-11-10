@@ -1,8 +1,8 @@
 // The page's side of the mock database: starts the worker, sends it work, and can stop it.
 // Stopping ends the worker (the only way to stop a running query); the next run rebuilds.
 
-// PostgreSQL in WebAssembly. Pinned to one version; to update, change the number and test.
-export const PGLITE_URL = "https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.5.11/dist/index.js";
+// The engine is PostgreSQL in WebAssembly (PGlite 0.5.11), served from this site (js/vendor/pglite/)
+// so no third-party code runs here. worker.js loads it; to update it, see SECURITY.md.
 
 let worker = null, seq = 0, builtKey = null;
 const pending = new Map();
@@ -43,7 +43,7 @@ export const busy = () => pending.size > 0;
 // steps: [{ sql, label, soft }] run in order; soft steps only warn when they fail.
 export async function build(key, steps, countSql) {
   builtKey = null;
-  const r = await call({ type: "build", url: PGLITE_URL, steps, countSql });
+  const r = await call({ type: "build", steps, countSql });
   builtKey = key;
   return r;
 }

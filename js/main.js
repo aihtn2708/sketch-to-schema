@@ -1,5 +1,6 @@
 // Startup. Each imported module sets up its own part of the page when it loads;
 // this file only adds the icons, fills in the AI connection, and opens the last project.
+import "./frame-guard.js";   // first, so nothing starts inside another site's frame
 import { injectIcons } from "./icons.js";
 import { renderConn } from "./connection.js";
 import "./schema/editor.js";

@@ -10,7 +10,7 @@ const fl = (obj, field) => (obj.flags.some((f) => f.field === field) ? " is-flag
 function noteHtml(obj) {
   if (!obj.flags.length) return "";
   return `<div class="notes">${obj.flags.map((f) =>
-    `<div class="note" data-flag="${obj.id}|${f.field}"><span class="nf">${FIELD_LABEL[f.field]}</span><span class="nt">${esc(f.note)}</span><button type="button" class="chip-ok" data-flag="${obj.id}|${f.field}">Looks right</button></div>`).join("")}</div>`;
+    `<div class="note" data-flag="${esc(obj.id)}|${f.field}"><span class="nf">${FIELD_LABEL[f.field]}</span><span class="nt">${esc(f.note)}</span><button type="button" class="chip-ok" data-flag="${esc(obj.id)}|${f.field}">Looks right</button></div>`).join("")}</div>`;
 }
 
 function refOptions(c) {
@@ -18,21 +18,21 @@ function refOptions(c) {
   for (const t of tables()) for (const c2 of t.columns) {
     if (c2.id === c.id) continue;
     const v = t.id + "." + c2.id;
-    html += `<option value="${v}"${refKey(c) === v ? " selected" : ""}>→ ${esc(t.name || "untitled")}.${esc(c2.name || "untitled")}</option>`;
+    html += `<option value="${esc(v)}"${refKey(c) === v ? " selected" : ""}>→ ${esc(t.name || "untitled")}.${esc(c2.name || "untitled")}</option>`;
   }
   return html;
 }
 
 function colHtml(c) {
-  return `<div class="col" data-c="${c.id}">
-    <input class="in in-name${fl(c, "name")}" id="n-${c.id}" data-f="name" value="${esc(c.name)}" aria-label="Column name" spellcheck="false">
-    <span class="type-wrap"><input class="in in-type${fl(c, "type")}${c.typeGuessed ? " guessed" : ""}" id="y-${c.id}" data-f="type" list="types" value="${esc(c.type)}" aria-label="Type" spellcheck="false">${c.typeGuessed ? `<span class="guess-tag">guess</span>` : ""}</span>
+  return `<div class="col" data-c="${esc(c.id)}">
+    <input class="in in-name${fl(c, "name")}" id="n-${esc(c.id)}" data-f="name" value="${esc(c.name)}" aria-label="Column name" spellcheck="false">
+    <span class="type-wrap"><input class="in in-type${fl(c, "type")}${c.typeGuessed ? " guessed" : ""}" id="y-${esc(c.id)}" data-f="type" list="types" value="${esc(c.type)}" aria-label="Type" spellcheck="false">${c.typeGuessed ? `<span class="guess-tag">guess</span>` : ""}</span>
     <div class="toggles">
-      <label class="tg${fl(c, "pk")}" title="Primary key"><input type="checkbox" id="k-${c.id}" data-f="pk"${c.pk ? " checked" : ""}>PK</label>
-      <label class="tg" title="Allows null"><input type="checkbox" id="u-${c.id}" data-f="nullable"${c.nullable ? " checked" : ""}>NULL</label>
-      <label class="tg" title="Unique"><input type="checkbox" id="q-${c.id}" data-f="unique"${c.unique ? " checked" : ""}>UNIQ</label>
+      <label class="tg${fl(c, "pk")}" title="Primary key"><input type="checkbox" id="k-${esc(c.id)}" data-f="pk"${c.pk ? " checked" : ""}>PK</label>
+      <label class="tg" title="Allows null"><input type="checkbox" id="u-${esc(c.id)}" data-f="nullable"${c.nullable ? " checked" : ""}>NULL</label>
+      <label class="tg" title="Unique"><input type="checkbox" id="q-${esc(c.id)}" data-f="unique"${c.unique ? " checked" : ""}>UNIQ</label>
     </div>
-    <select class="in in-ref${fl(c, "references")}" id="r-${c.id}" data-f="references" aria-label="References">${refOptions(c)}</select>
+    <select class="in in-ref${fl(c, "references")}" id="r-${esc(c.id)}" data-f="references" aria-label="References">${refOptions(c)}</select>
     <button type="button" class="icon-btn del-col" aria-label="Remove column ${esc(c.name)}">×</button>
   </div>${noteHtml(c)}`;
 }
@@ -48,10 +48,10 @@ export function renderDraft() {
   } else {
     el.innerHTML = tables().map((t) => {
       const shut = isCollapsed(t), n = flagCount(t);
-      return `<div class="tbl${shut ? " collapsed" : ""}" data-t="${t.id}">
+      return `<div class="tbl${shut ? " collapsed" : ""}" data-t="${esc(t.id)}">
       <div class="tbl-head">
         <button type="button" class="icon-btn tbl-toggle" aria-expanded="${!shut}" aria-label="${shut ? "Expand" : "Collapse"} table ${esc(t.name || "untitled")}">${svgIcon("chevron")}</button>
-        <input class="in in-tname${fl(t, "name")}" id="t-${t.id}" data-f="tname" value="${esc(t.name)}" aria-label="Table name" spellcheck="false">
+        <input class="in in-tname${fl(t, "name")}" id="t-${esc(t.id)}" data-f="tname" value="${esc(t.name)}" aria-label="Table name" spellcheck="false">
         <span class="tbl-meta">${t.columns.length} column${t.columns.length === 1 ? "" : "s"}</span>
         ${n ? `<span class="pill check flag-count" title="Items to check in this table">${n} to check</span>` : ""}
         <button type="button" class="quiet del-table">Remove table</button>
@@ -89,7 +89,7 @@ function updateSummary() {
 function clearFlag(obj, field, marked) {
   if (!obj || !obj.flags.some((f) => f.field === field)) return;
   obj.flags = obj.flags.filter((f) => f.field !== field);
-  document.querySelectorAll(`.note[data-flag="${obj.id}|${field}"]`).forEach((n) => {
+  document.querySelectorAll(`.note[data-flag="${CSS.escape(obj.id + "|" + field)}"]`).forEach((n) => {
     const box = n.parentElement; n.remove(); if (box && !box.children.length) box.remove();
   });
   marked?.classList.remove("is-flagged");

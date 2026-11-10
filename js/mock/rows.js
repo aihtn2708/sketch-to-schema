@@ -5,6 +5,7 @@
 import { colById } from "../schema/model.js";
 import { quoteIdent as q, tName, cName } from "../schema/export.js";
 import { pgType, kindOf } from "./setup.js";
+import { safeId } from "../util.js";
 
 const SOURCES = new Set(["generated", "edited", "imported"]);
 const usable = (tables) => tables.filter((t) => t.columns.length);
@@ -27,7 +28,7 @@ export function tableOrder(tables) {
   return out;
 }
 
-const NUM = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+const NUM = /^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/;   // written so it can't backtrack badly on long input
 function lit(kind, v) {
   if (v === null || v === undefined) return "NULL";
   if ((kind === "int" || kind === "num" || kind === "float") && NUM.test(v)) return v;
@@ -140,8 +141,15 @@ export function checkTable(t, rows, tables, data) {
 }
 
 /* ---------- CSV out ---------- */
+// Spreadsheets run a cell that starts with = + - @ (or a tab / return) as a formula. Such text
+// gets a leading ' so it stays text (CSV injection, OWASP); plain numbers like -5 are left alone.
+const FORMULA = /^[=+@\t\r]|^-(?![\d.]+$)/;
 export function toCsv(names, rows) {
-  const cell = (v) => (v === null || v === undefined ? "" : /[",\r\n]|^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const cell = (v) => {
+    if (v === null || v === undefined) return "";
+    const s = FORMULA.test(v) ? "'" + v : v;
+    return /[",\r\n]|^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   return [names, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
 
@@ -151,10 +159,10 @@ export function cleanTables(obj) {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return out;
   for (const [id, d] of Object.entries(obj).slice(0, 500)) {
     if (!d || !Array.isArray(d.cols) || !Array.isArray(d.rows)) continue;
-    const cols = d.cols.filter((c) => c && typeof c.name === "string").map((c) => ({ id: String(c.id ?? ""), name: c.name })).slice(0, 500);
+    const cols = d.cols.filter((c) => c && typeof c.name === "string").map((c) => ({ id: safeId(c.id ?? ""), name: c.name.slice(0, 200) })).slice(0, 500);
     if (!cols.length) continue;
     const rows = d.rows.slice(0, 50000).filter(Array.isArray).map((r) => cols.map((_, j) => (r[j] === null || r[j] === undefined ? null : String(r[j]))));
-    out[String(id)] = { name: String(d.name ?? ""), cols, rows, source: SOURCES.has(d.source) ? d.source : "edited" };
+    out[safeId(id)] = { name: String(d.name ?? "").slice(0, 200), cols, rows, source: SOURCES.has(d.source) ? d.source : "edited" };
   }
   return out;
 }

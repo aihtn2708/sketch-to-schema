@@ -1,11 +1,11 @@
 // The draft schema as data: turning a model's reply into tables, and reading the draft back.
 // Pure functions only (no page access), so they're covered by tests/model.test.js.
-import { uid } from "../util.js";
+import { uid, safeId } from "../util.js";
 
 export const FIELD_LABEL = { name: "Name", type: "Type", pk: "Key", references: "Reference" };
 
 export const normFlags = (f) => Array.isArray(f)
-  ? f.filter((x) => x && FIELD_LABEL[x.field] && x.note).map((x) => ({ field: x.field, note: String(x.note) }))
+  ? f.filter((x) => x && typeof x.field === "string" && Object.hasOwn(FIELD_LABEL, x.field) && x.note).map((x) => ({ field: x.field, note: String(x.note).slice(0, 1000) }))
   : [];
 
 // Long-form draft ({tables: [{name, columns: [...]}]}) → editable tables with ids and resolved references.
@@ -89,14 +89,30 @@ export function draftStats(tables, original) {
 }
 
 // Saved or imported drafts are untrusted: rebuild them field by field.
+// Ids go through safeId (see util.js); names and types are capped in length.
 export function cleanDraft(tables) {
-  return (Array.isArray(tables) ? tables : []).map((t) => ({
-    id: String(t?.id || uid()), name: String(t?.name ?? ""), flags: normFlags(t?.flags),
-    columns: (Array.isArray(t?.columns) ? t.columns : []).map((c) => ({
-      id: String(c?.id || uid()), name: String(c?.name ?? ""), type: String(c?.type ?? ""),
+  return (Array.isArray(tables) ? tables : []).slice(0, 500).map((t) => ({
+    id: t?.id ? safeId(t.id) : uid(), name: String(t?.name ?? "").slice(0, 200), flags: normFlags(t?.flags),
+    columns: (Array.isArray(t?.columns) ? t.columns : []).slice(0, 1000).map((c) => ({
+      id: c?.id ? safeId(c.id) : uid(), name: String(c?.name ?? "").slice(0, 200), type: String(c?.type ?? "").slice(0, 100),
       typeGuessed: !!c?.typeGuessed, pk: !!c?.pk, nullable: !!c?.nullable, unique: !!c?.unique,
-      ref: c?.ref && typeof c.ref.t === "string" && typeof c.ref.c === "string" ? { t: c.ref.t, c: c.ref.c } : null,
-      refName: c?.refName ? String(c.refName) : null, flags: normFlags(c?.flags)
+      ref: c?.ref && typeof c.ref.t === "string" && typeof c.ref.c === "string" ? { t: safeId(c.ref.t), c: safeId(c.ref.c) } : null,
+      refName: c?.refName ? String(c.refName).slice(0, 400) : null, flags: normFlags(c?.flags)
     }))
   }));
+}
+
+// The snapshot of the first draft (for the "kept" percentage): { id: { field: plain value } }.
+export function cleanOriginal(o) {
+  const out = {};
+  if (!o || typeof o !== "object" || Array.isArray(o)) return out;
+  for (const [id, v] of Object.entries(o).slice(0, 20000)) {
+    if (!v || typeof v !== "object") continue;
+    const fields = {};
+    for (const [k, x] of Object.entries(v)) if (Object.hasOwn(FIELD_LABEL, k) || ["name", "type", "pk", "nullable", "unique", "ref"].includes(k)) {
+      if (["string", "boolean", "number"].includes(typeof x) || x === null) fields[k] = x;
+    }
+    out[safeId(id)] = fields;
+  }
+  return out;
 }

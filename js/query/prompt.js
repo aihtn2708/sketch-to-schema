@@ -1,6 +1,7 @@
 // Ask in plain language: the schema as the model sees it, the prompt, and reading the answer.
 // Pure (no page access), covered by tests/query.test.js.
 import { colById } from "../schema/model.js";
+import { safeId } from "../util.js";
 
 export const DIALECTS = { postgresql: "PostgreSQL", mysql: "MySQL", sqlite: "SQLite", sqlserver: "SQL Server" };
 
@@ -102,7 +103,7 @@ export function cleanQueries(list) {
     const answer = normalizeAnswer(q?.answer);
     if (!answer || typeof q?.question !== "string" || !q.question.trim()) return null;
     return {
-      id: String(q.id || Math.random().toString(36).slice(2, 9)),
+      id: q.id ? safeId(q.id) : Math.random().toString(36).slice(2, 9),
       question: q.question.trim().slice(0, 1000),
       dialect: DIALECTS[q.dialect] ? q.dialect : "postgresql",
       schemaKey: typeof q.schemaKey === "string" ? q.schemaKey : "",

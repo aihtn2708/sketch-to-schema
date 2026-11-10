@@ -40,7 +40,7 @@ Notes:
 - **Free tiers keep data:** free OpenRouter models may log what they receive, and Google may use Gemini free-tier inputs to improve its products. Don't send confidential designs on free tiers.
 - **DeepSeek:** if you get a connection error, DeepSeek may not accept requests from web pages. Use OpenRouter with the model `deepseek/deepseek-v4.1-flash` instead.
 - **Paid providers:** set a monthly spend or usage limit in each provider's console.
-- **Remember on this device** keeps keys in the browser's local storage. Untick it on shared computers, and use **Forget key** when you're done.
+- A key is kept for the current tab only (it's gone when you close the tab). Tick **Remember on this device** to keep it in the browser's local storage instead; don't on shared computers, and use **Forget key** when you're done. See [SECURITY.md](SECURITY.md) for what is sent where.
 
 ## Projects
 
@@ -112,7 +112,7 @@ On the Ask and Test tabs, the **schema** stays in view on the left, as a **List*
   - **Query:** write SQL and press **Run** (Ctrl/⌘+Enter). Click a table name to see its rows. Anything a query changes (INSERT, UPDATE, DELETE, even DROP) is undone after the run, so every run starts from the same data. **Stop** ends a query that takes too long.
   - **Save as test** keeps the query and its current result. **Run all tests** runs them again and shows which ones now give a different result and how (for example *Expected 4 rows, got 5. New: (Nobody Here, Hanoi).*). Row order only counts when the query has `ORDER BY`. If the new result is right, press **Accept new result**.
   - On an Ask answer, **Run on mock data** runs its SQL here, and **Save as test** then names the test after the question.
-  - The first run downloads the database engine (about 5 MB, from cdn.jsdelivr.net) and takes a few seconds; after that the browser keeps it. If your network blocks that site, see *Mock database engine* below.
+  - The first run loads the database engine (about 5 MB, from this site) and takes a few seconds; after that the browser keeps it.
 
 ### Requests per day
 
@@ -143,13 +143,17 @@ node --test "tests/*.test.js"    # or: npm test
 ### Code layout
 
 ```
-index.html                  page markup only
+index.html                  page markup only (and the Content Security Policy)
+SECURITY.md                 what leaves the browser, security controls, audit, vendored engine checksums
+fonts/                      the fonts, served from this site (SIL Open Font License)
 css/
+  fonts.css                 font declarations for the files in fonts/
   tokens.css                colors (light and dark), fonts, base styles: change the look here
   layout.css                page grid, workspace tabs, panels, project bar, meeting mode
   components.css            buttons, toolbars, board, draft editor, export, projects dialog
 js/
   main.js                   startup: loads the modules, opens the last project
+  frame-guard.js            refuses to start inside another site's frame (loaded first)
   workspace.js              the three workspace tabs; emit("view", "design" | "ask" | "test") switches
   state.js                  shared app state + events (see the list at the top of the file)
   util.js                   small helpers ($, esc, uid, storage, messages)
@@ -197,6 +201,7 @@ js/
     mock-panel.js           the Test on mock data panel: status, query, tests
     data-view.js            the Sample data tab: Table and SQL views
     csv-import.js           the Import CSV dialog
+  vendor/pglite/            PostgreSQL in WebAssembly (PGlite 0.5.11), unchanged from npm; see SECURITY.md
   projects/
     db.js                   IndexedDB storage
     projects.js             autosave, project bar, Projects list, import/export
@@ -211,7 +216,7 @@ tests/                      node --test unit tests for the pure logic
 
 ### Common changes
 
-- **Add an AI provider:** copy `js/providers/gemini.js` to a new file, change its fields, `extract()` and `ask()`, then add it to the list in `js/providers/index.js`. The Provider menu updates itself.
+- **Add an AI provider:** copy `js/providers/gemini.js` to a new file, change its fields, `extract()` and `ask()`, then add it to the list in `js/providers/index.js` and its API address to `connect-src` in the Content Security Policy in `index.html`. The Provider menu updates itself.
 - **Change default models or hints:** edit that provider's file.
 - **Large diagrams:** each request allows up to 16,000 reply tokens and asks the model to think as little as possible, since thinking uses the same reply space. If a reply is still cut off, the complete tables are kept and the model is asked for only the rest, up to 4 parts (`js/providers/passes.js`). If tables are still missing after that, a warning above the draft says so.
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
@@ -219,6 +224,7 @@ tests/                      node --test unit tests for the pure logic
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
 - **Change the sample data:** value rules (by column name and type) are in `js/mock/generate.js`, with tests in `tests/mock.test.js`; cell checks are in `js/mock/rows.js` (`tests/rows.test.js`).
 - **Change how CSV files are read or guessed:** `js/mock/csv.js`, with tests in `tests/csv.test.js`.
-- **Mock database engine:** PostgreSQL compiled to WebAssembly ([PGlite](https://pglite.dev)), loaded from cdn.jsdelivr.net at the version pinned in `js/mock/db.js`. To serve it from this site instead (for networks that block the CDN), copy every `.js` file (keep the `fs/` folder too) plus `pglite.wasm`, `pglite.data` and `initdb.wasm` from the `dist` folder of `@electric-sql/pglite` at that version into `js/vendor/pglite/` (about 17 MB; skip the `.map`, `.d.ts` and `.tar.gz` files), and set `PGLITE_URL` to `new URL("../vendor/pglite/index.js", import.meta.url).href`.
-- **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.
+- **Mock database engine:** PostgreSQL compiled to WebAssembly ([PGlite](https://pglite.dev)) 0.5.11, served from `js/vendor/pglite/` (about 17 MB). To verify or update it, see [SECURITY.md](SECURITY.md).
+- **Security:** the page's Content Security Policy is the `<meta>` tag at the top of `index.html`. If you add a provider, add its API address to `connect-src` there, or its requests will be blocked. See [SECURITY.md](SECURITY.md).
+- **Change colors or fonts:** edit `css/tokens.css` (the font files are declared in `css/fonts.css`). The Diagram view reads the same colors, so it follows.
 - **Change how the diagram looks or is arranged:** card drawing is in `js/diagram/diagram.js`; sizes, arrangement and line routing are in `js/diagram/layout.js` (with tests in `tests/diagram.test.js`).

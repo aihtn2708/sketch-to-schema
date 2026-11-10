@@ -1,13 +1,19 @@
 // The AI connection panel: which provider, its key and its model.
-// Keys stay in this browser (localStorage when "Remember" is on, otherwise memory only).
+// Keys stay in this browser and go only to their own provider. With "Remember on this device"
+// off (the default) a key is kept for this tab only (sessionStorage: gone when the tab closes);
+// with it on, in localStorage until "Forget key".
 import { $, esc, store, showMsg } from "./util.js";
 import { PROVIDERS } from "./providers/index.js";
 import { requestsToday, onUsage } from "./usage.js";
 
 let current = PROVIDERS[store.get("s2s.provider")] ? store.get("s2s.provider") : "openrouter";
-const sessionKeys = {};
+const tab = {
+  get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch { /* storage unavailable */ } }
+};
+const sessionKeys = {};   // fallback when even sessionStorage is unavailable
 
-const keyFor = (id) => sessionKeys[id] || store.get("s2s.key." + id) || "";
+const keyFor = (id) => sessionKeys[id] || tab.get("s2s.key." + id) || store.get("s2s.key." + id) || "";
 function modelFor(id) {
   // Older versions of the page stored these two under different names.
   const legacy = id === "openrouter" ? store.get("s2s.orModels") : id === "anthropic" ? store.get("s2s.anModel") : null;
@@ -60,12 +66,15 @@ setConnOpen(savedOpen === "1" || (savedOpen !== "0" && !keyFor(current)), false)
 
 // The Provider menu is built from the provider list, so adding a provider needs no HTML change.
 $("#provider").innerHTML = Object.values(PROVIDERS).map((p) => `<option value="${p.id}">${esc(p.menuLabel)}</option>`).join("");
-$("#remember").checked = store.get("s2s.remember") !== "0";
+// Remembering keys is opt-in; people who already had a key remembered keep that setting.
+$("#remember").checked = store.get("s2s.remember") === "1" ||
+  (store.get("s2s.remember") === null && Object.keys(PROVIDERS).some((id) => store.get("s2s.key." + id)));
 
 $("#provider").addEventListener("change", (e) => { current = e.target.value; store.set("s2s.provider", current); renderConn(); });
 $("#apiKey").addEventListener("input", (e) => {
   const v = e.target.value.trim();
   sessionKeys[current] = v;
+  tab.set("s2s.key." + current, v);
   if ($("#remember").checked && v) store.set("s2s.key." + current, v); else store.del("s2s.key." + current);
   updateConnStatus();
 });
@@ -83,6 +92,6 @@ $("#remember").addEventListener("change", (e) => {
   }
 });
 $("#forgetKey").addEventListener("click", () => {
-  sessionKeys[current] = ""; store.del("s2s.key." + current); $("#apiKey").value = ""; updateConnStatus();
+  sessionKeys[current] = ""; tab.set("s2s.key." + current, ""); store.del("s2s.key." + current); $("#apiKey").value = ""; updateConnStatus();
   showMsg(`${PROVIDERS[current].name} key removed from this browser.`);
 });

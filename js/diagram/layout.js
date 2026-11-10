@@ -1,3 +1,4 @@
+import { safeId } from "../util.js";
 // Diagram geometry: table card sizes, relationships, automatic arrangement and connector paths.
 // Pure functions (no page access), covered by tests/diagram.test.js.
 
@@ -99,7 +100,7 @@ export function cleanPositions(pos) {
   const out = {};
   if (!pos || typeof pos !== "object") return out;
   for (const [id, p] of Object.entries(pos)) {
-    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) out[String(id)] = { x: p.x, y: p.y };
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) out[safeId(id)] = { x: p.x, y: p.y };
   }
   return out;
 }

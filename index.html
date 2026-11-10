@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Security policy: everything the page runs comes from this site; it only talks to the five AI
+     providers (and only when you press Extract or Ask). See SECURITY.md. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self'; connect-src 'self' https://openrouter.ai https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com https://api.deepseek.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sketch to Schema</title>
 <meta name="description" content="Turn a photo or an on-screen sketch of an ER diagram into PostgreSQL DDL or DBML.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Kalam:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
@@ -55,7 +58,7 @@
           <datalist id="modelList"></datalist>
         </label>
         <div class="actions">
-          <label class="check"><input type="checkbox" id="remember" checked> Remember on this device</label>
+          <label class="check"><input type="checkbox" id="remember"> Remember on this device</label>
           <button type="button" class="quiet" id="forgetKey">Forget key</button>
         </div>
       </div>
@@ -153,7 +156,7 @@
             <button type="button" class="quiet" id="collapseAll">Collapse all</button>
             <button type="button" class="quiet" id="expandAll">Expand all</button>
           </div>
-          <div id="tables" style="display:grid;gap:14px"></div>
+          <div id="tables"></div>
           <div class="actions">
             <button type="button" id="addTable">Add table</button>
             <button type="button" class="csv-import" data-icon="upload" title="Add tables from CSV files: columns, types and keys are guessed from the data">Add tables from CSV</button>

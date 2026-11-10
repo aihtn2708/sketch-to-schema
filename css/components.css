@@ -345,3 +345,7 @@ mark.hl { background: var(--check-bg); color: inherit; padding: 0; }
 .schema-side.dg-mode { height: calc(100vh - 74px); height: calc(100dvh - 74px); }
 .schema-side.dg-mode .side-list { display: none; }
 @media (max-width: 900px) { .schema-side.dg-mode { height: auto; } }
+
+#tables { display: grid; gap: 14px; }
+/* Shown instead of the app when another site puts this page in a frame. */
+.framed-note { max-width: 560px; margin: 15vh auto; padding: 0 16px; font: 16px/1.5 system-ui, sans-serif; }
