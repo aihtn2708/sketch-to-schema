@@ -10,6 +10,7 @@
 //   "project:loaded"  a project was opened → the drawing's undo history resets
 //   "mock:run"        run SQL on the mock database ({ sql, name, dialect }), e.g. from an Ask answer
 //   "view"            switch the workspace tab: "design" (Sketch to schema), "ask" or "test"
+//   "view:shown"      a workspace tab was opened (its name)
 
 import { defaultMock } from "./mock/saved.js";
 

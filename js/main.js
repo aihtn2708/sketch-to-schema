@@ -13,6 +13,7 @@ import "./mock/mock-panel.js";
 import "./mock/data-view.js";
 import "./mock/csv-import.js";
 import "./workspace.js";
+import "./schema/schema-side.js";
 import { initProjects } from "./projects/projects.js";
 import { state } from "./state.js";
 

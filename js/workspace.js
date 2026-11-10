@@ -2,7 +2,7 @@
 // One function fills the page at a time; the page always opens on Sketch to schema.
 // Other modules switch with emit("view", "design" | "ask" | "test").
 import { $ } from "./util.js";
-import { state, on } from "./state.js";
+import { state, on, emit } from "./state.js";
 import { inMeeting } from "./sketch/board.js";
 
 const VIEWS = ["design", "ask", "test"];
@@ -19,9 +19,14 @@ export function showView(v) {
     tab(x).setAttribute("aria-selected", String(on));
     tab(x).tabIndex = on ? 0 : -1;
   }
+  // Ask and Test share a layout with the schema sidebar.
+  $("#wsWork").hidden = v === "design";
+  $("#schemaToggle").hidden = v === "design";
+  emit("view:shown", v);
   // If the tabs are pinned at the top, start the new view at its top.
   const bar = $(".ws-tabs");
-  if (bar.getBoundingClientRect().top <= 0) window.scrollTo({ top: window.scrollY + panelOf(v).getBoundingClientRect().top - bar.offsetHeight - 12 });
+  const box = v === "design" ? panelOf(v) : $("#wsWork");
+  if (bar.getBoundingClientRect().top <= 0) window.scrollTo({ top: window.scrollY + box.getBoundingClientRect().top - bar.offsetHeight - 12 });
 }
 export const currentView = () => current;
 

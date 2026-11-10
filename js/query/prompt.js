@@ -122,8 +122,9 @@ export function suggestions(tables) {
     if (!hit || hit.t.id === t.id) continue;
     const parent = hit.t.name.replace(/_/g, " "), child = t.name.replace(/_/g, " ");
     const one = parent.replace(/ies$/, "y").replace(/([^s])s$/, "$1");          // "inventory items" → "inventory item"
+    const many = (s) => (/s$/.test(s) ? s : s.replace(/([^aeiou])y$/, "$1ie") + "s");   // "customer" → "customers"
     const Cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    out.push(`${Cap(parent)} with no ${child} in the past year`, `Number of ${child} per ${one}`, `${Cap(parent)} that have ${child}`);
+    out.push(`${Cap(many(parent))} with no ${many(child)} in the past year`, `Number of ${many(child)} per ${one}`, `${Cap(many(parent))} that have ${many(child)}`);
     if (out.length >= 6) return out.slice(0, 6);
   }
   return out;

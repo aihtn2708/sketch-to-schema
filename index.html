@@ -68,6 +68,7 @@
     <button type="button" role="tab" class="ws-tab" id="wsDesign" data-view="design" aria-controls="viewDesign" aria-selected="true">Sketch to schema <span class="tab-badge" id="draftBadge" hidden></span></button>
     <button type="button" role="tab" class="ws-tab" id="wsAsk" data-view="ask" aria-controls="viewAsk" aria-selected="false" tabindex="-1">Ask in plain language</button>
     <button type="button" role="tab" class="ws-tab" id="wsTest" data-view="test" aria-controls="viewTest" aria-selected="false" tabindex="-1">Test on mock data <span class="tab-count" id="wsTestCount"></span></button>
+    <button type="button" class="quiet schema-toggle" id="schemaToggle" aria-pressed="true" aria-controls="schemaSide" hidden data-icon="layout">Schema</button>
   </nav>
 
   <div class="grid" id="viewDesign" role="tabpanel" aria-labelledby="wsDesign">
@@ -198,6 +199,22 @@
 
   </div>
 
+  <!-- Ask and Test: the draft schema stays in view on the left -->
+  <div class="ws-work" id="wsWork" hidden>
+  <aside class="panel schema-side" id="schemaSide" aria-labelledby="schemaSideTitle">
+    <div class="side-head">
+      <h2 id="schemaSideTitle">Schema</h2>
+      <span class="hint" id="schemaSideCount"></span>
+      <button type="button" class="icon-btn" id="schemaSideClose" aria-label="Hide the schema" title="Hide the schema">×</button>
+    </div>
+    <input class="in side-filter" id="schemaFilter" type="search" placeholder="Filter tables and columns" aria-label="Filter tables and columns" spellcheck="false">
+    <div class="side-list" id="schemaList"></div>
+    <div class="side-foot">
+      <p class="hint" id="schemaInsertHint">Click a name to put it in the question.</p>
+      <button type="button" class="quiet" id="schemaEdit">Edit in Sketch to schema</button>
+    </div>
+  </aside>
+  <div class="ws-main">
   <div class="ws-view" id="viewAsk" role="tabpanel" aria-labelledby="wsAsk" hidden>
     <section class="panel" id="askPanel" aria-labelledby="askTitle">
       <div class="panel-head">
@@ -318,6 +335,8 @@
         </div>
       </div>
     </section>
+  </div>
+  </div>
   </div>
 </div>
 

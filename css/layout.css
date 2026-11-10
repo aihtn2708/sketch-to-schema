@@ -24,6 +24,17 @@ h1 { font-size: clamp(26px, 3.2vw, 34px); line-height: 1.1; margin: 0; letter-sp
 .tab-badge { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--check-bg); color: var(--check); border: 1px solid var(--check-line); font-variant-numeric: tabular-nums; }
 .ws-tab .tab-count { font-weight: 500; }
 .ws-view { display: grid; gap: 20px; min-width: 0; }
+/* Ask and Test: the schema on the left, the work on the right. */
+.ws-work { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
+.ws-work.no-side { grid-template-columns: minmax(0, 1fr); }
+.ws-work.no-side .schema-side { display: none; }
+.ws-main { display: grid; gap: 20px; min-width: 0; }
+.schema-toggle { margin-left: auto; align-self: center; font-size: 13.5px; }
+.schema-toggle[aria-pressed="true"] { color: var(--accent); }
+@media (max-width: 900px) {
+  .ws-work { grid-template-columns: minmax(0, 1fr); }
+  .schema-side { position: static !important; max-height: 45vh !important; }
+}
 
 /* Project bar */
 .projbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
@@ -38,7 +49,7 @@ body.meeting #projBar { display: none; }
 
 /* Meeting mode: the board takes the whole window */
 body.meeting { padding-block: 8px; }
-body.meeting header, body.meeting #connPanel, body.meeting #draftPanel, body.meeting #outPanel, body.meeting .ws-tabs, body.meeting .ws-view,
+body.meeting header, body.meeting #connPanel, body.meeting #draftPanel, body.meeting #outPanel, body.meeting .ws-tabs, body.meeting .ws-work,
 body.meeting .source, body.meeting .privacy-note { display: none; }
 body.meeting .wrap { max-width: none; }
 body.meeting .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch"; }

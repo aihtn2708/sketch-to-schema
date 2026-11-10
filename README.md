@@ -63,6 +63,8 @@ The page has three tabs, one function at a time. It always opens on the first:
 
 The tabs stay at the top of the window as you scroll. **Run on mock data** on an Ask answer switches to Test on mock data.
 
+On the Ask and Test tabs, the **schema** stays in view on the left: every table with its columns, types, keys (PK) and references (→), and a dot on anything marked to check. Filter it by name, fold tables you don't need, and click a table or column name to insert it at the cursor in the question or the SQL query. **Schema** at the right of the tab bar hides or shows it (remembered), and **Edit in Sketch to schema** goes back to change it.
+
 - **AI connection** folds down to one status line once a key is saved. Click it to change the provider, key or model.
 - **Photo:** upload, drag in, or paste (Ctrl/⌘+V) a photo of the diagram.
 - **Draw:** sketch on screen.
@@ -167,6 +169,7 @@ js/
     model.js                model reply → draft tables; draft stats; checking saved drafts
     export.js               draft → PostgreSQL DDL and DBML
     editor.js               the draft editor UI
+    schema-side.js          the schema sidebar on the Ask and Test tabs
     export-panel.js         the Export panel (tabs, Copy)
   diagram/
     layout.js               card sizes, relationships, auto-arrange, connector paths (pure, tested)
