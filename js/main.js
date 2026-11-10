@@ -10,6 +10,7 @@ import "./diagram/diagram.js";
 import "./extract.js";
 import "./query/ask-panel.js";
 import "./mock/mock-panel.js";
+import "./workspace.js";
 import { initProjects } from "./projects/projects.js";
 import { state } from "./state.js";
 

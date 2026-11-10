@@ -63,7 +63,14 @@
     </div>
   </section>
 
-  <div class="grid">
+  <!-- Workspace tabs: one function at a time; the page always opens on Sketch to schema -->
+  <nav class="ws-tabs" role="tablist" aria-label="Workspace">
+    <button type="button" role="tab" class="ws-tab" id="wsDesign" data-view="design" aria-controls="viewDesign" aria-selected="true">Sketch to schema <span class="tab-badge" id="draftBadge" hidden></span></button>
+    <button type="button" role="tab" class="ws-tab" id="wsAsk" data-view="ask" aria-controls="viewAsk" aria-selected="false" tabindex="-1">Ask in plain language</button>
+    <button type="button" role="tab" class="ws-tab" id="wsTest" data-view="test" aria-controls="viewTest" aria-selected="false" tabindex="-1">Test on mock data <span class="tab-count" id="wsTestCount"></span></button>
+  </nav>
+
+  <div class="grid" id="viewDesign" role="tabpanel" aria-labelledby="wsDesign">
     <section class="panel" id="sketchPanel" aria-labelledby="sketchTitle">
       <div class="panel-head">
         <h2 id="sketchTitle">Sketch</h2>
@@ -185,6 +192,9 @@
       </div>
     </section>
 
+  </div>
+
+  <div class="ws-view" id="viewAsk" role="tabpanel" aria-labelledby="wsAsk" hidden>
     <section class="panel" id="askPanel" aria-labelledby="askTitle">
       <div class="panel-head">
         <h2 id="askTitle">Ask in plain language</h2>
@@ -213,6 +223,9 @@
       </div>
     </section>
 
+  </div>
+
+  <div class="ws-view" id="viewTest" role="tabpanel" aria-labelledby="wsTest" hidden>
     <section class="panel" id="mockPanel" aria-labelledby="mockTitle">
       <div class="panel-head">
         <h2 id="mockTitle">Test on mock data</h2>

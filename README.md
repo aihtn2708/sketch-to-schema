@@ -55,6 +55,14 @@ Projects live in this browser only. Clearing site data, or a private window, rem
 
 ## Using it
 
+The page has three tabs, one function at a time. It always opens on the first:
+
+- **Sketch to schema:** the sketch, the draft schema and Export. The tab shows how many items are marked to check.
+- **Ask in plain language:** SQL from a question.
+- **Test on mock data:** the mock database, queries and tests. The tab shows how many tests there are, or how many failed.
+
+The tabs stay at the top of the window as you scroll. **Run on mock data** on an Ask answer switches to Test on mock data.
+
 - **AI connection** folds down to one status line once a key is saved. Click it to change the provider, key or model.
 - **Photo:** upload, drag in, or paste (Ctrl/⌘+V) a photo of the diagram.
 - **Draw:** sketch on screen.
@@ -124,10 +132,11 @@ node --test "tests/*.test.js"    # or: npm test
 index.html                  page markup only
 css/
   tokens.css                colors (light and dark), fonts, base styles: change the look here
-  layout.css                page grid, panels, project bar, meeting mode
+  layout.css                page grid, workspace tabs, panels, project bar, meeting mode
   components.css            buttons, toolbars, board, draft editor, export, projects dialog
 js/
   main.js                   startup: loads the modules, opens the last project
+  workspace.js              the three workspace tabs; emit("view", "design" | "ask" | "test") switches
   state.js                  shared app state + events (see the list at the top of the file)
   util.js                   small helpers ($, esc, uid, storage, messages)
   icons.js                  toolbar icons
