@@ -28,13 +28,11 @@ $("#extractBtn").addEventListener("click", async () => {
     state.schema = next;
     state.original = snapshotOf(next.tables);
     emit("draft:replaced"); emit("dirty");
-    emit("show", "draftPanel");
     const n = next.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
     const howRead = out.parts > 1 ? ` (read in ${out.parts} parts${out.incomplete ? "; some tables may be missing" : ""})` : "";
-    const done = `Drafted ${next.tables.length} tables with ${out.model}${howRead}. ` +
-      (n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over.");
-    showMsg(done + (inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""));
-    const dm = $("#draftMsg"); dm.hidden = false; dm.textContent = done;   // also on the Draft schema tab
+    showMsg(`Drafted ${next.tables.length} tables with ${out.model}${howRead}. ` +
+      (n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over.") +
+      (inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""));
   } catch (e) {
     if (e?.name === "AbortError") showMsg("Stopped. The draft wasn't changed.");
     else showMsg(e?.message || "Extraction failed. Try again.", true);

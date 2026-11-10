@@ -108,7 +108,6 @@ async function loadProject(p) {
     state.editor = { collapsed: cleanCollapsed(p.editor?.collapsed) };
     state.queries = cleanQueries(p.queries);
     state.mock = cleanMock(p.mock);
-    $("#draftMsg").hidden = true;
     emit("project:loaded");
     emit("draft:replaced");
     setMode(p.mode === "draw" ? "draw" : "photo");

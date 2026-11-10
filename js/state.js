@@ -9,7 +9,6 @@
 //   "text:commit"     finish any text box being typed on the board (before switching modes, extracting, saving)
 //   "project:loaded"  a project was opened → the drawing's undo history resets
 //   "mock:run"        run SQL on the mock database ({ sql, name, dialect }), e.g. from an Ask answer
-//   "show"            bring a panel into view in its pane (panel id, e.g. "draftPanel")
 
 import { defaultMock } from "./mock/saved.js";
 

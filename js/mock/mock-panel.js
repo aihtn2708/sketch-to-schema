@@ -362,7 +362,7 @@ $("#testsList").addEventListener("change", (e) => {
 on("mock:run", async ({ sql, name = "", dialect = "postgresql" }) => {
   sqlEl.value = M().query = sql; emit("dirty");
   showTab("query");
-  emit("show", "mockPanel");
+  $("#mockPanel").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   await runEditor();
   pendingName = name;
   if (dialect !== "postgresql") msg($("#mockMsg"), `This query was written for ${DIALECTS[dialect] || dialect}; the mock database is PostgreSQL, so some syntax may not run. Ask again with PostgreSQL selected if it fails.`);

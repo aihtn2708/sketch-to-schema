@@ -146,7 +146,6 @@ const local = (e) => { const r = wrap.getBoundingClientRect(); return [e.clientX
 
 function openInEditor(id) {
   drag = null;
-  emit("show", "draftPanel");
   setView("editor");
   expandTable(id);
   const input = $("#t-" + CSS.escape(id));
