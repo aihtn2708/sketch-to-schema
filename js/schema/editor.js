@@ -2,6 +2,7 @@
 import { $, esc, uid } from "../util.js";
 import { state, on, emit } from "../state.js";
 import { FIELD_LABEL, refKey, findObj, colById, draftStats } from "./model.js";
+import { svgIcon } from "../icons.js";
 
 const tables = () => state.schema.tables;
 const fl = (obj, field) => (obj.flags.some((f) => f.field === field) ? " is-flagged" : "");
@@ -36,22 +37,32 @@ function colHtml(c) {
   </div>${noteHtml(c)}`;
 }
 
+const isCollapsed = (t) => !!state.editor.collapsed[t.id];
+const flagCount = (t) => t.flags.length + t.columns.reduce((n, c) => n + c.flags.length, 0);
+
 export function renderDraft() {
   const el = $("#tables");
+  $("#editorTools").hidden = tables().length < 2;
   if (!tables().length) {
     el.innerHTML = `<div class="empty">No tables in the draft yet. Extract them from a sketch, or add a table by hand.</div>`;
   } else {
-    el.innerHTML = tables().map((t) => `<div class="tbl" data-t="${t.id}">
+    el.innerHTML = tables().map((t) => {
+      const shut = isCollapsed(t), n = flagCount(t);
+      return `<div class="tbl${shut ? " collapsed" : ""}" data-t="${t.id}">
       <div class="tbl-head">
+        <button type="button" class="icon-btn tbl-toggle" aria-expanded="${!shut}" aria-label="${shut ? "Expand" : "Collapse"} table ${esc(t.name || "untitled")}">${svgIcon("chevron")}</button>
         <input class="in in-tname${fl(t, "name")}" id="t-${t.id}" data-f="tname" value="${esc(t.name)}" aria-label="Table name" spellcheck="false">
         <span class="tbl-meta">${t.columns.length} column${t.columns.length === 1 ? "" : "s"}</span>
+        ${n ? `<span class="pill check flag-count" title="Items to check in this table">${n} to check</span>` : ""}
         <button type="button" class="quiet del-table">Remove table</button>
+        <span class="tbl-cols" title="${esc(t.columns.map((c) => c.name).join(", "))}">${t.columns.map((c) => esc(c.name || "untitled") + (c.pk ? " (PK)" : c.ref ? " →" : "")).join(", ") || "No columns"}</span>
       </div>
       ${noteHtml(t)}
       ${t.columns.length ? `<div class="col-head" aria-hidden="true"><span>Column</span><span>Type</span><span>Flags</span><span>References</span><span></span></div>` : ""}
       <div class="cols">${t.columns.map(colHtml).join("")}</div>
       <div class="tbl-foot"><button type="button" class="quiet add-col">+ Add column</button></div>
-    </div>`).join("");
+    </div>`;
+    }).join("");
   }
   const w = $("#warnings");
   w.hidden = !state.schema.warnings.length;
@@ -130,6 +141,7 @@ $("#tables").addEventListener("click", (e) => {
   }
   const t = tables().find((x) => x.id === b.closest("[data-t]")?.dataset.t);
   if (!t) return;
+  if (b.classList.contains("tbl-toggle")) { setCollapsed(t, !isCollapsed(t)); emit("dirty"); return; }
   if (b.classList.contains("del-col")) {
     const cid = b.closest("[data-c]").dataset.c;
     t.columns = t.columns.filter((c) => c.id !== cid);
@@ -145,6 +157,32 @@ $("#tables").addEventListener("click", (e) => {
     replaced();
   }
 });
+
+// Collapse or expand one table without re-rendering the editor.
+function setCollapsed(t, shut) {
+  if (shut) state.editor.collapsed[t.id] = true; else delete state.editor.collapsed[t.id];
+  const box = document.querySelector(`.tbl[data-t="${CSS.escape(t.id)}"]`);
+  if (!box) return;
+  box.classList.toggle("collapsed", shut);
+  const btn = box.querySelector(".tbl-toggle");
+  btn.setAttribute("aria-expanded", String(!shut));
+  btn.setAttribute("aria-label", `${shut ? "Expand" : "Collapse"} table ${t.name || "untitled"}`);
+  if (!shut) return;
+  // Bring the collapsed summary up to date with edits made while the table was open.
+  const n = flagCount(t);
+  box.querySelector(".flag-count")?.remove();
+  if (n) box.querySelector(".tbl-meta").insertAdjacentHTML("afterend", `<span class="pill check flag-count" title="Items to check in this table">${n} to check</span>`);
+  box.querySelector(".tbl-meta").textContent = `${t.columns.length} column${t.columns.length === 1 ? "" : "s"}`;
+  const cols = box.querySelector(".tbl-cols");
+  cols.title = t.columns.map((c) => c.name).join(", ");
+  cols.innerHTML = t.columns.map((c) => esc(c.name || "untitled") + (c.pk ? " (PK)" : c.ref ? " →" : "")).join(", ") || "No columns";
+}
+export function expandTable(id) {
+  const t = tables().find((x) => x.id === id);
+  if (t && isCollapsed(t)) { setCollapsed(t, false); emit("dirty"); }
+}
+$("#collapseAll").addEventListener("click", () => { for (const t of tables()) setCollapsed(t, true); emit("dirty"); });
+$("#expandAll").addEventListener("click", () => { for (const t of tables()) setCollapsed(t, false); emit("dirty"); });
 
 $("#addTable").addEventListener("click", () => {
   const t = { id: uid(), name: "", flags: [], columns: [{ id: uid(), name: "id", type: "integer", typeGuessed: false, pk: true, nullable: false, unique: false, ref: null, flags: [] }] };

@@ -1,7 +1,7 @@
 // The Extract button: sketch image → chosen provider → draft schema.
 import { $, showMsg } from "./util.js";
 import { state, emit } from "./state.js";
-import { active, updateConnStatus } from "./connection.js";
+import { active, updateConnStatus, focusKey } from "./connection.js";
 import { sketchImage, inMeeting } from "./sketch/board.js";
 import { fromCompact, fromModel, snapshotOf } from "./schema/model.js";
 
@@ -10,7 +10,7 @@ let ctl = null;
 $("#extractBtn").addEventListener("click", async () => {
   emit("text:commit");
   const { provider, key, model } = active();
-  if (!key) { showMsg("Add your API key under AI connection first.", true); $("#apiKey").focus(); return; }
+  if (!key) { showMsg("Add your API key under AI connection first.", true); focusKey(); return; }
   if (state.mode === "draw" && !state.shapes.length) { showMsg("Draw something first: a box per table with its name and columns.", true); return; }
 
   ctl = new AbortController();
@@ -28,11 +28,13 @@ $("#extractBtn").addEventListener("click", async () => {
     state.schema = next;
     state.original = snapshotOf(next.tables);
     emit("draft:replaced"); emit("dirty");
+    emit("show", "draftPanel");
     const n = next.tables.reduce((a, t) => a + t.flags.length + t.columns.reduce((b, c) => b + c.flags.length, 0), 0);
     const howRead = out.parts > 1 ? ` (read in ${out.parts} parts${out.incomplete ? "; some tables may be missing" : ""})` : "";
-    showMsg(`Drafted ${next.tables.length} tables with ${out.model}${howRead}. ` +
-      (n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over.") +
-      (inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""));
+    const done = `Drafted ${next.tables.length} tables with ${out.model}${howRead}. ` +
+      (n ? `${n} item${n === 1 ? "" : "s"} marked to check.` : "Nothing marked, but give it a once-over.");
+    showMsg(done + (inMeeting() ? " Leave meeting mode (Esc) to review the draft." : ""));
+    const dm = $("#draftMsg"); dm.hidden = false; dm.textContent = done;   // also on the Draft schema tab
   } catch (e) {
     if (e?.name === "AbortError") showMsg("Stopped. The draft wasn't changed.");
     else showMsg(e?.message || "Extraction failed. Try again.", true);

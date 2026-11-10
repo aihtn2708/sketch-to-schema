@@ -33,6 +33,9 @@ function setSaveState(kind, detail) {
     : kind === "error" ? detail : "";
 }
 
+// Collapsed tables in the editor: a list of table ids → { id: true }.
+const cleanCollapsed = (list) => Object.fromEntries((Array.isArray(list) ? list : []).filter((x) => typeof x === "string").slice(0, 2000).map((x) => [x, true]));
+
 /* ---------- Saving ---------- */
 // The open project as a record, from the current app state.
 function currentRecord() {
@@ -42,6 +45,7 @@ function currentRecord() {
     drawing: { shapes: state.shapes },
     draft: { tables: state.schema.tables, warnings: state.schema.warnings }, original: state.original,
     diagram: { pos: state.diagram.pos },
+    editor: { collapsed: Object.keys(state.editor.collapsed) },
     queries: state.queries,
     mock: state.mock,
     tableCount: state.schema.tables.length, thumb: boardThumbnail()
@@ -78,7 +82,7 @@ function blankProject(name) {
   const now = Date.now();
   return { id: newId(), name, createdAt: now, updatedAt: now, mode: "draw", photo: null, photoName: null,
     drawing: { shapes: [] }, draft: { tables: [], warnings: [] },
-    original: {}, diagram: { pos: {} }, queries: [], mock: defaultMock(), tableCount: 0, thumb: null };
+    original: {}, diagram: { pos: {} }, editor: { collapsed: [] }, queries: [], mock: defaultMock(), tableCount: 0, thumb: null };
 }
 
 async function uniqueName(base) {
@@ -101,8 +105,10 @@ async function loadProject(p) {
     state.schema = { tables: cleanDraft(p.draft?.tables), warnings: (Array.isArray(p.draft?.warnings) ? p.draft.warnings : []).map(String) };
     state.original = p.original && typeof p.original === "object" ? p.original : {};
     state.diagram = { pos: cleanPositions(p.diagram?.pos) };
+    state.editor = { collapsed: cleanCollapsed(p.editor?.collapsed) };
     state.queries = cleanQueries(p.queries);
     state.mock = cleanMock(p.mock);
+    $("#draftMsg").hidden = true;
     emit("project:loaded");
     emit("draft:replaced");
     setMode(p.mode === "draw" ? "draw" : "photo");
@@ -158,6 +164,7 @@ $("#importFile").addEventListener("change", async (e) => {
     mode: ip.mode === "draw" ? "draw" : "photo", photo: ip.photo, photoName: ip.photoName ? String(ip.photoName) : null,
     drawing: { shapes: cleanShapes(ip.drawing?.shapes) },
     diagram: { pos: cleanPositions(ip.diagram?.pos) },
+    editor: { collapsed: Object.keys(cleanCollapsed(ip.editor?.collapsed)) },
     queries: cleanQueries(ip.queries),
     mock: cleanMock(ip.mock),
     draft: { tables: cleanDraft(ip.draft?.tables), warnings: (Array.isArray(ip.draft?.warnings) ? ip.draft.warnings : []).map(String) },

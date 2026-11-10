@@ -55,6 +55,14 @@ Projects live in this browser only. Clearing site data, or a private window, rem
 
 ## Using it
 
+The page has two panes side by side, so you can change the schema and work with SQL at the same time:
+
+- **Design** (left): **Sketch**, **Draft schema** and **Export** tabs. The Draft schema tab shows how many items are marked to check.
+- **SQL** (right): **Ask in plain language** and **Test on mock data** tabs.
+- Drag the bar between the panes to resize them (or focus it and use ← →); double-click it to make them equal again. The tabs and pane sizes are remembered.
+- On a phone, one pane shows at a time; switch with **Design / SQL** at the top.
+- **AI connection** folds down to one status line once a key is saved. Click it to change the provider, key or model.
+
 - **Photo:** upload, drag in, or paste (Ctrl/⌘+V) a photo of the diagram.
 - **Draw:** sketch on screen.
   - **Box** (B): drag to draw a table.
@@ -73,8 +81,9 @@ Projects live in this browser only. Clearing site data, or a private window, rem
   - **Full screen:** meeting mode with the browser's full screen. Good for screen sharing.
   - Extract sends only the part of the board you drew on, so a spread-out drawing still reads well.
 - **Extract schema**, then check anything highlighted in amber. Editing a field or pressing **Looks right** clears its flag.
+- **Extract schema** opens the Draft schema tab when it finishes.
 - **Draft schema** has two views:
-  - **Editor:** edit tables and columns, and check flags.
+  - **Editor:** edit tables and columns, and check flags. The arrow next to a table name collapses it to one line showing its columns and how many items it has to check; **Collapse all** and **Expand all** do every table. Collapsed tables are saved with the project.
   - **Diagram:** the draft as table cards with relationship lines, like dbdiagram.io. `*` marks the column holding the reference and `1` the column it points to; key icons mark primary keys and amber marks columns to check. Drag tables to move them (positions are saved with the project), drag the background to move around, Ctrl/⌘ + scroll to zoom, **Arrange** to lay everything out again, and double-click a table to edit it. **SVG** and **PNG** download the diagram.
 - Copy **PostgreSQL DDL** or **DBML** from Export.
 - **Ask in plain language:** type a question about the data, for example *inventory items that have had no transactions over the past two years*, pick the SQL dialect, and press **Ask** (or Ctrl/⌘+Enter). It uses the same AI connection as Extract.
@@ -123,10 +132,11 @@ node --test "tests/*.test.js"    # or: npm test
 index.html                  page markup only
 css/
   tokens.css                colors (light and dark), fonts, base styles: change the look here
-  layout.css                page grid, panels, project bar, meeting mode
+  layout.css                the two panes, panels, project bar, meeting mode
   components.css            buttons, toolbars, board, draft editor, export, projects dialog
 js/
   main.js                   startup: loads the modules, opens the last project
+  layout.js                 the two panes: tabs, resizing, the phone switch, emit("show", panel)
   state.js                  shared app state + events (see the list at the top of the file)
   util.js                   small helpers ($, esc, uid, storage, messages)
   icons.js                  toolbar icons

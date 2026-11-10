@@ -1,20 +1,51 @@
 /* Page layout: header, panels, the two-column workbench, project bar and meeting mode. */
-.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; }
-header { display: grid; gap: 6px; }
-h1 { font-size: clamp(26px, 3.2vw, 34px); line-height: 1.1; margin: 0; letter-spacing: -0.01em; font-weight: 700; text-wrap: balance; }
-.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.wrap { max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+/* Wide screens: the page fills the window and the two panes scroll on their own. */
+@media (min-width: 901px) { body { padding-block: 20px 16px; } .wrap { min-height: calc(100vh - 36px); min-height: calc(100dvh - 36px); } }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+h1 { font-size: 22px; line-height: 1.2; margin: 0; letter-spacing: -0.01em; font-weight: 700; }
+.lede { margin: 0; color: var(--muted); font-size: 14px; }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .panel-body { padding: 16px 18px; display: grid; gap: 14px; }
 
-.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "sketch draft" "out draft" "ask ask" "mock mock"; align-items: start; }
-@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch" "draft" "out" "ask" "mock"; } }
-#sketchPanel { grid-area: sketch; } #draftPanel { grid-area: draft; } #outPanel { grid-area: out; } #askPanel { grid-area: ask; } #mockPanel { grid-area: mock; }
+/* Split view: Design (Sketch, Draft schema, Export) | SQL (Ask, Test on mock data) */
+.split { flex: 1 1 0; min-height: 560px; display: grid; grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--split-l, 1fr)) 14px minmax(0, var(--split-r, 1fr)); }
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pane-tabs { display: flex; gap: 2px; padding: 4px 10px 0; border-bottom: 1px solid var(--line); overflow-x: auto; flex: none; scrollbar-width: none; }
+.pane-tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 11px 12px 9px; font-size: 14.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.pane-tab:hover { color: var(--ink); border-color: transparent; border-bottom-color: var(--line); }
+.pane-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab-badge { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--check-bg); color: var(--check); border: 1px solid var(--check-line); font-variant-numeric: tabular-nums; }
+.pane-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; container-type: inline-size; container-name: pane; }
+.pane .panel { border: 0; border-radius: 0; background: transparent; }
+.pane .panel-head { padding: 10px 18px; }
+/* The tab already names the panel; keep the heading for screen readers only. */
+.pane .panel-head h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.split-divider { cursor: col-resize; touch-action: none; display: grid; place-items: center; border-radius: 6px; }
+.split-divider::after { content: ""; width: 4px; height: 44px; border-radius: 4px; background: var(--line); transition: background .15s; }
+.split-divider:hover::after, .split-divider:focus-visible::after, .split-divider.dragging::after { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+.seg.pane-switch { display: none; align-self: flex-start; }
+/* Wide screens: in Draw mode the board grows to fill the Design pane. */
+@media (min-width: 901px) {
+  #sketchPanel:not([hidden]) { min-height: 100%; display: flex; flex-direction: column; }
+  #sketchPanel > .panel-body { flex: 1; display: flex; flex-direction: column; }
+  #paneDesign .board.drawing { flex: 1 1 0; height: auto; min-height: 320px; }
+}
+@media (max-width: 900px) {
+  .seg.pane-switch { display: inline-flex; }
+  .split { display: block; min-height: 0; }
+  .split-divider { display: none; }
+  .pane-body { overflow: visible; }
+  .split[data-show="design"] #paneSql, .split[data-show="sql"] #paneDesign { display: none; }
+}
 
 /* Project bar */
-.projbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
+.projbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 14px; }
 .proj-icon { display: inline-flex; color: var(--accent); flex: none; }
 .proj-icon svg { width: 20px; height: 20px; }
 .proj-name { font-weight: 600; font-size: 16px; flex: 1 1 220px; min-width: 0; border-color: transparent; background: transparent; }
@@ -26,10 +57,13 @@ body.meeting #projBar { display: none; }
 
 /* Meeting mode: the board takes the whole window */
 body.meeting { padding-block: 8px; }
-body.meeting header, body.meeting #connPanel, body.meeting #draftPanel, body.meeting #outPanel, body.meeting #askPanel, body.meeting #mockPanel,
-body.meeting .source, body.meeting .privacy-note { display: none; }
+body.meeting header, body.meeting #connPanel, body.meeting #paneSql, body.meeting .split-divider, body.meeting .pane-tabs, body.meeting .pane-switch,
+body.meeting #draftPanel, body.meeting #outPanel, body.meeting .source, body.meeting .privacy-note { display: none; }
+body.meeting .split { display: block; min-height: 0; }
+body.meeting #paneDesign { display: block !important; border: 0; background: transparent; overflow: visible; }
+body.meeting .pane-body { overflow: visible; }
+body.meeting #sketchPanel { display: flex !important; }
 body.meeting .wrap { max-width: none; }
-body.meeting .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sketch"; }
 body.meeting #sketchPanel { height: calc(100vh - 16px); height: calc(100dvh - 16px); display: flex; flex-direction: column; }
 body.meeting #sketchPanel > .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding-block: 10px; }
 body.meeting .board.drawing { flex: 1; min-height: 0; height: auto; }

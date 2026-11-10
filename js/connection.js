@@ -45,6 +45,19 @@ export function renderConn() {
 
 onUsage(updateConnStatus);
 
+// The panel folds down to its status line once a key is set, to leave room for the work.
+function setConnOpen(open, save = true) {
+  $("#connBody").hidden = !open;
+  $("#connToggle").setAttribute("aria-expanded", String(open));
+  $("#connPanel").classList.toggle("collapsed", !open);
+  if (save) store.set("s2s.connOpen", open ? "1" : "0");
+}
+// Used when a feature needs a key: open the panel and put the cursor in the key box.
+export function focusKey() { setConnOpen(true); $("#apiKey").focus(); }
+$("#connToggle").addEventListener("click", () => setConnOpen($("#connBody").hidden));
+const savedOpen = store.get("s2s.connOpen");
+setConnOpen(savedOpen === "1" || (savedOpen !== "0" && !keyFor(current)), false);
+
 // The Provider menu is built from the provider list, so adding a provider needs no HTML change.
 $("#provider").innerHTML = Object.values(PROVIDERS).map((p) => `<option value="${p.id}">${esc(p.menuLabel)}</option>`).join("");
 $("#remember").checked = store.get("s2s.remember") !== "0";

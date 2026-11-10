@@ -3,7 +3,7 @@
 // same question again against the same schema replays the saved answer without a request.
 import { $, esc, uid, store } from "../util.js";
 import { state, on, emit } from "../state.js";
-import { active } from "../connection.js";
+import { active, focusKey } from "../connection.js";
 import { parseJson } from "../providers/prompt.js";
 import { DIALECTS, ASK_SCHEMA, schemaText, schemaKey, askPrompt, normalizeAnswer, sameQuestion, suggestions } from "./prompt.js";
 import { checkSql } from "./check.js";
@@ -112,7 +112,7 @@ async function ask({ force = false } = {}) {
     if (hit) { shownId = hit.id; renderHistory(); renderAnswer(); askMsg("Shown from this project's history, so no request was used. Press Ask again for a fresh answer."); return; }
   }
   const { provider, key, model } = active();
-  if (!key) { askMsg("Add your API key under AI connection first.", true); $("#apiKey").focus(); return; }
+  if (!key) { askMsg("Add your API key under AI connection first.", true); focusKey(); return; }
 
   ctl = new AbortController();
   $("#askBtn").disabled = true; $("#askStop").hidden = false;

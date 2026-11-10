@@ -6,6 +6,10 @@
 .field { display: grid; gap: 5px; min-width: 0; }
 .field > span { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
 .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.conn-toggle { border: 0; background: transparent; padding: 2px 6px 2px 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.conn-toggle svg { transition: transform .15s; color: var(--muted); }
+.conn-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+#connPanel.collapsed .panel-head { border-bottom: 0; padding-block: 8px; }
 .conn-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--check); flex: none; }
 .dot.on { background: var(--accent); }
@@ -58,11 +62,23 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 .tbl { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .tbl-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--sunk); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .tbl-head .in-tname { font-family: var(--font-code); font-weight: 500; font-size: 15px; flex: 1 1 160px; min-width: 0; }
-.tbl-meta { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tbl-meta { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl-toggle { width: 28px; height: 28px; margin-right: -4px; }
+.tbl-toggle:hover { color: var(--ink); }
+.tbl-toggle svg { width: 18px; height: 18px; transition: transform .15s; }
+.tbl.collapsed .tbl-toggle svg { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .tbl-toggle svg { transition: none; } }
+.tbl-cols { display: none; flex: 1 1 100%; order: 9; font-family: var(--font-code); font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; padding-left: 30px; }
+.tbl.collapsed .tbl-cols { display: block; }
+.tbl.collapsed .tbl-head { border-bottom: 0; }
+.tbl.collapsed > :not(.tbl-head) { display: none; }
+.tbl-head .pill { padding: 1px 8px; font-size: 12px; }
+.tbl:not(.collapsed) .tbl-head .flag-count { display: none; }
+.editor-tools { justify-content: space-between; }
 .col-head, .col { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.1fr) auto minmax(0, 1.3fr) 32px; gap: 8px; align-items: center; padding: 8px 12px; }
 .col-head { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding-block: 8px 2px; }
 .col + .col, .notes + .col { border-top: 1px solid var(--line); }
-@media (max-width: 640px) {
+@container pane (max-width: 600px) {
   .col-head { display: none; }
   .col { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px; grid-template-areas: "name type del" "tog tog tog" "ref ref ref"; }
   .col > .in-name { grid-area: name; } .col > .type-wrap { grid-area: type; } .col > .toggles { grid-area: tog; } .col > .in-ref { grid-area: ref; } .col > .del-col { grid-area: del; }
@@ -118,7 +134,7 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 /* Toolbar icons */
 .tool svg { width: 18px; height: 18px; flex: none; }
 .tool:not(:has(.lbl)) { padding-inline: 8px; }
-@media (max-width: 640px) {
+@container pane (max-width: 600px) {
   .tool .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .tool { padding: 7px 8px; }
 }
@@ -149,7 +165,7 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 
 /* Ask in plain language */
 .ask-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 22px; align-items: start; }
-@media (max-width: 900px) { .ask-grid { grid-template-columns: minmax(0, 1fr); } }
+@container pane (max-width: 760px) { .ask-grid { grid-template-columns: minmax(0, 1fr); } }
 .ask-side, .ask-answer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .sql-block, .venn-card > * { min-width: 0; }
 .ask-input { resize: vertical; min-height: 84px; font-family: var(--font-ui); font-size: 15px; line-height: 1.45; }
@@ -174,7 +190,7 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 .note-box.warn { background: var(--check-bg); border-color: var(--check-line); }
 .note-box code, .venn-sets code { font-family: var(--font-code); font-size: 12.5px; }
 .venn-card { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 18px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
-@media (max-width: 640px) { .venn-card { grid-template-columns: minmax(0, 1fr); } }
+@container pane (max-width: 560px) { .venn-card { grid-template-columns: minmax(0, 1fr); } }
 .venn-fig svg { display: block; width: 100%; height: auto; max-width: 320px; }
 .venn-text { display: grid; gap: 6px; font-size: 13.5px; min-width: 0; }
 .venn-text b { font-size: 15px; }
@@ -190,7 +206,7 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 
 /* Test on mock data */
 .mock-grid { display: grid; grid-template-columns: minmax(200px, 3fr) minmax(0, 9fr); gap: 22px; align-items: start; }
-@media (max-width: 900px) { .mock-grid { grid-template-columns: minmax(0, 1fr); } }
+
 .mock-side, .mock-main, .mock-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .mock-view[hidden] { display: none; }
 .db-status { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 8px 10px; border-radius: var(--r); background: var(--sunk); border: 1px solid var(--line); }
@@ -235,3 +251,13 @@ table.res tr:last-child td { border-bottom: 0; }
 .test-why { margin: 0; font-size: 13.5px; }
 .test-sql { margin: 0; font-family: var(--font-code); font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 3.2em; overflow: hidden; }
 .pill.fail { background: var(--check-bg); border-color: var(--check-line); color: var(--danger); }
+
+/* Test on mock data in a narrow pane: the side column moves on top and gets compact. */
+@container pane (max-width: 820px) {
+  .mock-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .mock-side { gap: 10px; }
+  .mock-side > .hint, .mock-side .eyebrow { display: none; }
+  .mock-tables { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mock-tables button { width: auto; gap: 8px; border-color: var(--line); padding: 4px 10px; border-radius: 999px; }
+  .mock-tables .tc:empty { display: none; }
+}

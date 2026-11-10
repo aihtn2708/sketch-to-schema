@@ -3,6 +3,7 @@
 // double-click a table to edit it.
 import { $, esc, store, slug } from "../util.js";
 import { state, on, emit } from "../state.js";
+import { expandTable } from "../schema/editor.js";
 import { HEAD_H, ROW_H, PAD_X, KEY_W, tableSize, relations, autoLayout, placeMissing, edgeGeometry, bounds } from "./layout.js";
 
 const wrap = $("#dgWrap");
@@ -145,7 +146,9 @@ const local = (e) => { const r = wrap.getBoundingClientRect(); return [e.clientX
 
 function openInEditor(id) {
   drag = null;
+  emit("show", "draftPanel");
   setView("editor");
+  expandTable(id);
   const input = $("#t-" + CSS.escape(id));
   input?.scrollIntoView({ block: "center", behavior: "smooth" });
   input?.focus({ preventScroll: true });
