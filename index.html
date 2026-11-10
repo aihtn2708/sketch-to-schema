@@ -153,7 +153,11 @@
             <button type="button" class="quiet" id="expandAll">Expand all</button>
           </div>
           <div id="tables" style="display:grid;gap:14px"></div>
-          <div><button type="button" id="addTable">Add table</button></div>
+          <div class="actions">
+            <button type="button" id="addTable">Add table</button>
+            <button type="button" class="csv-import" data-icon="upload" title="Add tables from CSV files: columns, types and keys are guessed from the data">Add tables from CSV</button>
+            <span class="hint" id="draftCsvMsg"></span>
+          </div>
         </div>
         <div class="diagram-view" id="diagramView" hidden>
           <div class="toolbar" role="toolbar" aria-label="Diagram tools">
@@ -266,9 +270,38 @@
             <div class="mock-result" id="mockResult" aria-live="polite"></div>
           </div>
           <div class="mock-view" id="mvData" role="tabpanel" aria-labelledby="mtData" hidden>
+            <div class="data-bar">
+              <div class="seg" role="tablist" aria-label="Sample data view">
+                <button type="button" role="tab" id="dvTable" aria-selected="true" aria-controls="dataTableView">Table</button>
+                <button type="button" role="tab" id="dvSql" aria-selected="false" aria-controls="dataSqlView">SQL</button>
+              </div>
+              <span class="hint" id="dataMode"></span>
+            </div>
             <p class="note-box warn" id="dataNote" hidden></p>
-            <textarea class="in code-in data-in" id="mockData" rows="18" spellcheck="false" autocomplete="off" aria-label="Sample data SQL"></textarea>
-            <p class="hint">These INSERT statements load the mock database. Edit them to add the rows your tests need; the database is rebuilt on the next run.</p>
+            <div class="data-view" id="dataTableView">
+              <div class="actions grid-bar">
+                <select class="in dt-select" id="dtTable" aria-label="Table to show"></select>
+                <span class="pill" id="dtSource"></span>
+                <span class="grid-acts" id="dtActs">
+                  <button type="button" id="dtAddRow" data-icon="plus">Add row</button>
+                  <button type="button" id="dtRegen" data-icon="refresh" title="Replace this table's rows with new generated ones">Regenerate</button>
+                  <button type="button" class="csv-import" data-icon="upload" title="Load rows from a CSV file, or add a new table from one">Import CSV</button>
+                  <button type="button" id="dtExport" data-icon="download" title="Download this table's rows as a CSV file">Export CSV</button>
+                </span>
+              </div>
+              <div class="note-box" id="dtOwnSql" hidden>
+                You're using your own SQL for the sample data, so this table shows its result and can't be edited here.
+                <button type="button" id="dtToRows">Use table editing</button>
+              </div>
+              <div class="note-box warn dt-checks" id="dtChecks" hidden></div>
+              <div class="dt-wrap" id="dtGrid"></div>
+              <div class="actions dt-pager" id="dtPager"></div>
+              <p class="hint" id="dtHint">Click a cell to edit it. An empty cell is NULL. Columns that point to another table suggest its values as you type.</p>
+            </div>
+            <div class="data-view" id="dataSqlView" hidden>
+              <p class="hint" id="sqlNote"></p>
+              <textarea class="in code-in data-in" id="mockData" rows="18" spellcheck="false" autocomplete="off" aria-label="Sample data SQL"></textarea>
+            </div>
             <details class="setup-details">
               <summary>Schema used for the mock database</summary>
               <ul class="ans-list" id="typeNotes"></ul>
@@ -299,6 +332,20 @@
     <ul class="proj-list" id="projList"></ul>
   </div>
 </dialog>
+
+<dialog class="proj-dialog csv-dialog" id="csvDialog" aria-labelledby="csvTitle">
+  <div class="dlg-head">
+    <h2 id="csvTitle">Import CSV</h2>
+    <span class="hint">Nothing leaves your browser</span>
+    <button type="button" class="icon-btn" id="csvClose" aria-label="Close">×</button>
+  </div>
+  <div class="dlg-body" id="csvBody"></div>
+  <div class="dlg-foot actions">
+    <button type="button" class="primary" id="csvGo">Import</button>
+    <button type="button" class="quiet" id="csvCancel">Cancel</button>
+  </div>
+</dialog>
+<input class="file-input" type="file" id="csvFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" multiple>
 
 <datalist id="types">
   <option value="integer"><option value="bigint"><option value="serial"><option value="uuid">

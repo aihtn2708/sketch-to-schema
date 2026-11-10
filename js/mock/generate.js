@@ -1,4 +1,4 @@
-// Sample data for the mock database, made in the browser (no AI request).
+// Sample data for the mock database, made in the browser (no AI request), as rows per table.
 // Values come from each column's type and name (email, price, created_at, …). Foreign keys
 // point at real parent rows, and about 1 parent in 5 gets no child rows, so questions like
 // "customers with no orders" have something to find. The same seed always gives the same data.
@@ -6,6 +6,7 @@
 import { colById } from "../schema/model.js";
 import { quoteIdent as q, tName, cName } from "../schema/export.js";
 import { pgType, kindOf } from "./setup.js";
+import { rowsToSql } from "./rows.js";
 
 // Small fast seeded random numbers (mulberry32).
 export function rng(seed) {
@@ -62,7 +63,25 @@ function lit(kind, v) {
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
-export function generateData(tables, { rows = 20, seed = 1, today = new Date() } = {}) {
+// Display form of a generated value: what the table shows and what the INSERT statements hold.
+function str(ci, v) {
+  if (v === null || v === undefined) return null;
+  if (ci.kind === "bool") return v ? "true" : "false";
+  if (ci.kind === "num" && typeof v === "number") return v.toFixed(ci.s);
+  return String(v);
+}
+// Back from display form, for tables that are kept as they are (edited or imported).
+function parse(ci, v) {
+  if (v === null || v === undefined) return null;
+  if ((ci.kind === "int" || ci.kind === "num" || ci.kind === "float") && /^[-+]?\d+(\.\d+)?$/.test(v)) return Number(v);
+  if (ci.kind === "bool") return /^(true|t|yes|y|on|1)$/i.test(v);
+  return v;
+}
+
+// tables: the draft. keep: { tableId: { rows } } tables to leave as they are (rows already lined up
+// with the table's columns); their values are still used as parents for foreign keys.
+// → { tableId: { name, cols: [{ id, name }], rows: [[text or null]], source } }
+export function generateRows(tables, { rows = 20, seed = 1, today = new Date(), keep = {} } = {}) {
   const r = rng(seed);
   const pick = (a) => a[Math.floor(r() * a.length)];
   const often = (a) => a[Math.floor(Math.pow(r(), 1.8) * a.length)];   // earlier entries more common
@@ -81,6 +100,12 @@ export function generateData(tables, { rows = 20, seed = 1, today = new Date() }
     rows: []
   }]));
   for (const ti of info.values()) for (const ci of ti.cols) if (ci.ref && !info.has(ci.ref.t.id)) ci.ref = null;
+  for (const ti of info.values()) {
+    const k = keep[ti.t.id];
+    if (!k) continue;
+    ti.kept = true;
+    ti.rows = k.rows.map((row) => new Map(ti.cols.map((ci, j) => [ci, parse(ci, row[j] ?? null)])));
+  }
 
   // A value for one column of one row, from its kind and its name.
   function value(ti, ci, i, ctx) {
@@ -195,6 +220,7 @@ export function generateData(tables, { rows = 20, seed = 1, today = new Date() }
 
   // Pass 1: every column except foreign keys.
   for (const ti of info.values()) {
+    if (ti.kept) continue;
     const seen = new Map(ti.cols.map((ci) => [ci, new Set()]));
     const n = counts(ti);
     for (let i = 0; i < n; i++) {
@@ -229,7 +255,7 @@ export function generateData(tables, { rows = 20, seed = 1, today = new Date() }
   // Pass 2: foreign keys, from the parents' real values. About 1 in 5 parents gets no children.
   for (const ti of order) {
     const fks = ti.cols.filter((ci) => ci.ref);
-    if (!fks.length) continue;
+    if (!fks.length || ti.kept) continue;
     const pkCols = ti.cols.filter((ci) => ci.c.pk);
     const tuples = new Set();
     const uniq = new Map(fks.filter((ci) => ci.c.unique || (ci.c.pk && pkCols.length === 1)).map((ci) => [ci, new Set()]));
@@ -271,18 +297,19 @@ export function generateData(tables, { rows = 20, seed = 1, today = new Date() }
     ti.rows = kept;
   }
 
-  // The INSERT script, parents first, 200 rows per statement.
-  const parts = [`-- Sample data: generated from the draft schema (seed ${seed}).`,
-    "-- Edit it freely; it runs every time the mock database is built.", ""];
-  const result = {};
-  for (const ti of order) {
-    result[ti.name] = ti.rows.length;
-    if (!ti.rows.length) { parts.push(`-- ${ti.name}: no rows`, ""); continue; }
-    const head = `INSERT INTO ${q(ti.name)} (${ti.cols.map((ci) => q(ci.name)).join(", ")}) VALUES`;
-    for (let s = 0; s < ti.rows.length; s += 200) {
-      const chunk = ti.rows.slice(s, s + 200).map((row) => `  (${ti.cols.map((ci) => lit(ci.kind, row.get(ci))).join(", ")})`);
-      parts.push(`${head}\n${chunk.join(",\n")};`, "");
-    }
-  }
-  return { sql: parts.join("\n"), counts: result };
+  const out = {};
+  for (const ti of order) out[ti.t.id] = {
+    name: ti.name, cols: ti.cols.map((ci) => ({ id: ci.c.id, name: ci.name })),
+    rows: ti.rows.map((row) => ti.cols.map((ci) => str(ci, row.get(ci)))),
+    source: ti.kept ? keep[ti.t.id].source || "edited" : "generated"
+  };
+  return out;
+}
+
+// Generated data as an INSERT script, plus row counts by table name.
+export function generateData(tables, opts = {}) {
+  const data = generateRows(tables, opts);
+  const counts = {};
+  for (const d of Object.values(data)) counts[d.name] = d.rows.length;
+  return { sql: rowsToSql(tables, data, `generated from the draft schema (seed ${opts.seed ?? 1})`), counts, data };
 }

@@ -144,7 +144,9 @@ $("#exportProj").addEventListener("click", async () => {
   if (!state.project) return;
   await saveNow();
   exportProject(currentRecord());
-  showMsg(`Exported "${$("#projName").value.trim() || "Untitled project"}" as a file. Import it on another browser to continue there.`);
+  const imported = Object.values(state.mock.tables || {}).filter((d) => d.source === "imported").map((d) => d.name);
+  showMsg(`Exported "${$("#projName").value.trim() || "Untitled project"}" as a file. Import it on another browser to continue there.` +
+    (imported.length ? ` It includes rows imported from CSV (${imported.join(", ")}); share it only with people who may see that data.` : ""));
 });
 
 $("#importFile").addEventListener("change", async (e) => {

@@ -127,5 +127,7 @@ test("cleanMock keeps a saved mock database's settings safe", async () => {
   assert.deepEqual(cleanMock(null), defaultMock());
   const m = cleanMock({ rows: 9999, seed: -1, data: "INSERT 1", edited: 1, query: 5, tests: [{ sql: "x" }] });
   assert.equal(m.rows, 20); assert.equal(m.seed, 1); assert.equal(m.data, "INSERT 1");
-  assert.equal(m.edited, true); assert.equal(m.query, ""); assert.deepEqual(m.tests, []);
+  assert.equal(m.mode, "sql"); assert.equal(m.query, ""); assert.deepEqual(m.tests, []);
+  assert.equal(cleanMock({ edited: false, data: "INSERT 1" }).mode, "rows");
+  assert.equal(cleanMock({ mode: "sql", data: "" }).mode, "rows");
 });

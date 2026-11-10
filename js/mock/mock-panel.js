@@ -5,24 +5,18 @@
 // changes. Every query runs inside a transaction that is rolled back, so the data never drifts.
 import { $, esc, uid } from "../util.js";
 import { state, on, emit } from "../state.js";
-import { schemaKey, DIALECTS } from "../query/prompt.js";
-import { createSql, fkSteps, typeNotes, countSql } from "./setup.js";
-import { generateData } from "./generate.js";
+import { DIALECTS } from "../query/prompt.js";
 import { snapshot, compare, txControl } from "./compare.js";
+import { M, setup, dataSql, dbKey, reconcile, remember, undo, forgetUndo, engine, ensureDb, stopEngine } from "./sample.js";
+import { tName } from "../schema/export.js";
 import * as db from "./db.js";
 
-const M = () => state.mock;
-const sqlEl = $("#mockSql"), dataEl = $("#mockData"), resultEl = $("#mockResult");
+const sqlEl = $("#mockSql"), resultEl = $("#mockResult");
 const SHOW_ROWS = 500;          // rows drawn in the results table
 let tab = "query";
 let last = null;                // { sql, result, title } of the last successful run
-let info = null;                // { counts, warnings } from the last build
-let phase = "idle";             // idle | building | ready | error
-let buildError = null;
 let pendingName = "";           // test name suggested by Ask ("Run on mock data")
-let undoGen = null;             // sample data before the last "New sample data"
 let testRuns = new Set();       // ids of tests running now
-let started = false;            // the engine has been downloaded and started once this visit
 let running = false;            // a query or test is running
 
 const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
@@ -33,58 +27,15 @@ function msg(el, text, isErr = false) {
   el.hidden = !text; el.textContent = text || ""; el.classList.toggle("err", isErr);
 }
 
-/* ---------- Schema, data and database ---------- */
-function setup() {
-  const tables = state.schema.tables.filter((t) => t.columns.length);
-  const create = createSql(tables), fks = fkSteps(tables);
-  return { tables, create, fks, key: schemaKey(create + "\n" + fks.map((f) => f.sql).join("\n")) };
-}
-const dbKey = (s) => schemaKey(s.key + "\n" + M().data);
-
-function generate(s, newSeed) {
-  if (newSeed) M().seed = (M().seed % 999999) + 1;
-  M().data = generateData(s.tables, { rows: M().rows, seed: M().seed }).sql;
-  M().dataSchema = s.key;
-  M().edited = false;
-  emit("dirty");
-}
-
-// Sample data follows the draft automatically until someone edits it by hand.
-function ensureData(s = setup()) {
-  if (!s.tables.length) return;
-  if (!M().data.trim() || (M().dataSchema !== s.key && !M().edited)) generate(s, false);
-}
-
-async function ensureDb() {
-  const s = setup();
-  if (!s.tables.length) throw { message: "Add tables to the draft schema first. The mock database is built from it.", label: "empty" };
-  ensureData(s);
-  const key = dbKey(s);
-  if (db.isBuilt(key) && phase === "ready") return;
-  phase = "building"; buildError = null; renderStatus();
-  try {
-    info = await db.build(key, [
-      { sql: s.create, label: "schema" },
-      { sql: M().data, label: "data" },
-      ...s.fks.map((f) => ({ sql: f.sql, label: f.label, soft: true }))
-    ], countSql(s.tables));
-    phase = "ready"; started = true;
-  } catch (e) {
-    info = null;
-    phase = e?.stopped ? "idle" : "error";
-    buildError = e?.stopped ? null : e;
-    throw e;
-  } finally { renderStatus(); renderTables(); renderDataNote(); }
-}
-
 // "Line 3: column "x" does not exist", with where it happened.
-function errText(e, sql) {
+export function errText(e, sql) {
   if (!e) return "Something went wrong.";
   if (e.stopped) return "Stopped. The database restarts on the next run.";
   let line = "";
-  const src = e.label === "data" ? M().data : e.label === "query" ? sql : "";
+  const ownSql = M().mode === "sql";
+  const src = e.label === "data" ? (ownSql ? dataSql() : "") : e.label === "query" ? sql : "";
   if (e.position && src) line = `line ${src.slice(0, e.position - 1).split("\n").length}: `;
-  const where = e.label === "data" ? "Sample data, " : e.label === "schema" ? "Creating the tables: " : line ? "Query, " : "";
+  const where = e.label === "data" ? (ownSql ? "Sample data SQL, " : "Sample data: ") : e.label === "schema" ? "Creating the tables: " : line ? "Query, " : "";
   return `${where}${line}${e.message}`.replace(/^(.)/, (c) => c.toUpperCase());
 }
 
@@ -92,11 +43,12 @@ function errText(e, sql) {
 function renderStatus() {
   const dot = $("#dbDot"), s = setup();
   const built = s.tables.length && db.isBuilt(dbKey(s));
+  const { phase, info, started } = engine;
   let text;
   dot.className = "dot";
   if (!s.tables.length) text = "No tables yet. Add tables to the draft schema first.";
   else if (phase === "building") { dot.classList.add("busy"); text = started ? "Building the database…" : "Starting PostgreSQL and loading the sample data…"; }
-  else if (phase === "error") { dot.classList.add("err"); text = "Couldn't build the database. See the message below."; }
+  else if (phase === "error") { dot.classList.add("err"); text = "Couldn't build the database. See the error message."; }
   else if (phase === "ready" && built) {
     dot.classList.add("on");
     const rows = (info?.counts || []).reduce((n, r) => n + r.n, 0);
@@ -111,34 +63,13 @@ function renderStatus() {
 
 function renderTables() {
   const s = setup();
-  const counts = new Map((phase === "ready" && db.isBuilt(dbKey(s)) ? info?.counts || [] : []).map((r) => [r.t, r.n]));
+  const counts = new Map((engine.phase === "ready" && db.isBuilt(dbKey(s)) ? engine.info?.counts || [] : []).map((r) => [r.t, r.n]));
   $("#mockTables").innerHTML = s.tables.length
     ? s.tables.map((t) => {
-      const name = t.name.trim() || "untitled_table", n = counts.get(name);
+      const name = tName(t), n = counts.get(name);
       return `<li><button type="button" data-t="${esc(name)}" title="Show the rows in ${esc(name)}"><span class="tn">${esc(name)}</span><span class="tc">${n === undefined ? "" : plural(n, "row")}</span></button></li>`;
     }).join("")
     : `<li class="hint">None yet.</li>`;
-}
-
-function renderDataNote() {
-  const s = setup(), note = $("#dataNote");
-  const warn = [];
-  if (M().edited && M().dataSchema && M().dataSchema !== s.key) warn.push("The draft schema changed after this data was edited. Press New sample data to start again from the draft, or update the INSERT statements to match.");
-  if (phase === "error" && buildError?.label === "data") warn.push(errText(buildError));
-  for (const w of info?.warnings || []) warn.push(`Relationship ${w.label} isn't enforced: ${w.message}.`);
-  note.hidden = !warn.length;
-  note.innerHTML = warn.map(esc).join("<br>");
-}
-
-function renderData() {
-  const s = setup();
-  if (dataEl.value !== M().data) dataEl.value = M().data;
-  const notes = typeNotes(s.tables);
-  $("#typeNotes").innerHTML = notes.length ? `<li class="lh">Types changed to run on PostgreSQL:</li>${notes.map((n) => `<li><code>${esc(n)}</code></li>`).join("")}` : "";
-  $("#mockSetup").textContent = s.tables.length
-    ? `${s.create}\n\n-- Then the sample data, then:\n${s.fks.map((f) => f.sql).join("\n") || "-- (no relationships)"}`
-    : "-- No tables yet.";
-  renderDataNote();
 }
 
 function renderResult(r, title = "") {
@@ -199,7 +130,7 @@ function showTab(name) {
   tab = name;
   for (const [id, t] of [["mtQuery", "query"], ["mtData", "data"], ["mtTests", "tests"]]) $("#" + id).setAttribute("aria-selected", String(t === name));
   $("#mvQuery").hidden = name !== "query"; $("#mvData").hidden = name !== "data"; $("#mvTests").hidden = name !== "tests";
-  if (name === "data") { ensureData(); renderData(); }
+  if (name === "data") emit("mock:data-tab");
   if (name === "tests") renderTests();
 }
 
@@ -207,7 +138,7 @@ function renderAll() {
   $("#mockRows").value = M().rows;
   if (sqlEl.value !== M().query) sqlEl.value = M().query;
   renderStatus(); renderTables(); renderTests();
-  if (tab === "data") renderData();
+  if (tab === "data") emit("mock:data-tab");
 }
 
 /* ---------- Running ---------- */
@@ -275,7 +206,7 @@ async function saveTest() {
 
 /* ---------- Events ---------- */
 $("#mockRun").addEventListener("click", () => runEditor());
-$("#mockStop").addEventListener("click", () => { db.stop(); phase = "idle"; renderStatus(); renderTables(); });
+$("#mockStop").addEventListener("click", stopEngine);
 $("#mockSave").addEventListener("click", saveTest);
 $("#testsRun").addEventListener("click", runAllTests);
 for (const [id, t] of [["mtQuery", "query"], ["mtData", "data"], ["mtTests", "tests"]]) $("#" + id).addEventListener("click", () => showTab(t));
@@ -290,11 +221,6 @@ sqlEl.addEventListener("keydown", (e) => {
 });
 sqlEl.addEventListener("input", () => { delete sqlEl.dataset.esc; M().query = sqlEl.value; pendingName = ""; dirtySoon(); });
 
-dataEl.addEventListener("input", () => {
-  M().data = dataEl.value; M().edited = true;
-  dirtySoon(); renderStatus(); renderTables();
-});
-
 $("#mockRows").addEventListener("change", () => {
   const n = Math.round(Number($("#mockRows").value));
   M().rows = Number.isFinite(n) ? Math.min(500, Math.max(1, n)) : 20;
@@ -302,22 +228,34 @@ $("#mockRows").addEventListener("change", () => {
   emit("dirty");
 });
 
+// New sample data: generated tables get new values; edited and imported tables are kept.
 $("#mockGen").addEventListener("click", () => {
   const s = setup();
-  if (!s.tables.length) { msg($("#mockGenMsg"), "Add tables to the draft schema first.", true); return; }
-  undoGen = { data: M().data, seed: M().seed, edited: M().edited, dataSchema: M().dataSchema };
-  generate(s, true);
-  const counts = generateData(s.tables, { rows: M().rows, seed: M().seed }).counts;
-  const m = $("#mockGenMsg");
-  m.hidden = false; m.classList.remove("err");
-  m.innerHTML = `New sample data: ${Object.entries(counts).map(([t, n]) => `${esc(t)} ${n}`).join(", ")}. ${M().tests.length ? "Tests still expect the old data, so some may fail. " : ""}<button type="button" class="quiet" id="mockUndo">Undo</button>`;
-  renderAll(); if (tab === "data") renderData();
+  if (!s.tables.length) { notice("Add tables to the draft schema first.", false, true); return; }
+  remember();
+  const wasSql = M().mode === "sql";
+  M().mode = "rows";
+  reconcile(s, { newSeed: true });
+  const all = Object.values(M().tables), kept = all.filter((d) => d.source !== "generated");
+  const parts = [`New sample data: ${all.filter((d) => d.source === "generated").map((d) => `${d.name} ${d.rows.length}`).join(", ") || "no generated tables"}.`];
+  if (kept.length) parts.push(`Kept as you left them: ${kept.map((d) => d.name).join(", ")} (Regenerate in the Sample data tab replaces one).`);
+  if (wasSql) parts.push("Your own sample data SQL was replaced by table data.");
+  if (M().tests.length) parts.push("Tests still expect the old data, so some may fail.");
+  notice(parts.join(" "), true);
+  renderAll();
 });
+
+function notice(text, withUndo = false, isErr = false) {
+  const m = $("#mockGenMsg");
+  m.hidden = !text; m.classList.toggle("err", isErr);
+  m.innerHTML = text ? esc(text) + (withUndo ? ` <button type="button" class="quiet" id="mockUndo">Undo</button>` : "") : "";
+}
+const showNotice = notice;
+on("mock:notice", ({ text, undo: u }) => notice(text, u));
 $("#mockGenMsg").addEventListener("click", (e) => {
-  if (!e.target.closest("#mockUndo") || !undoGen) return;
-  Object.assign(M(), undoGen); undoGen = null;
-  msg($("#mockGenMsg"), "Sample data restored.");
-  emit("dirty"); renderAll(); if (tab === "data") renderData();
+  if (!e.target.closest("#mockUndo")) return;
+  if (undo()) notice("Sample data restored.");
+  renderAll();
 });
 
 // A table in the list: show its rows without touching the query being edited.
@@ -369,16 +307,17 @@ on("mock:run", async ({ sql, name = "", dialect = "postgresql" }) => {
 });
 
 const onDraft = debounce(() => {
-  if (M().data || tab === "data") ensureData();
   renderStatus(); renderTables(); renderTests();
-  if (tab === "data") renderData();
+  if (tab === "data") emit("mock:data-tab");
 }, 300);
 on("draft:replaced", onDraft);
 on("draft:edited", onDraft);
 on("project:loaded", () => {
-  last = null; undoGen = null; pendingName = ""; testRuns = new Set();
-  if (phase === "error") { phase = "idle"; buildError = null; }
-  resultEl.innerHTML = ""; msg($("#mockMsg"), ""); msg($("#mockGenMsg"), "");
+  last = null; pendingName = ""; testRuns = new Set(); forgetUndo();
+  if (engine.phase === "error") { engine.phase = "idle"; engine.error = null; }
+  resultEl.innerHTML = ""; msg($("#mockMsg"), ""); showNotice("");
   renderAll();
 });
+on("mock:status", () => { renderStatus(); renderTables(); });
+on("mock:changed", () => { renderStatus(); renderTables(); });
 renderAll();

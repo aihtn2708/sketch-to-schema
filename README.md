@@ -93,8 +93,15 @@ The tabs stay at the top of the window as you scroll. **Run on mock data** on an
   - Answers are saved with the project. Asking the same question again shows the saved answer without a request; **Ask again** gets a fresh one. If the draft changed since, the answer says so.
 
 - **Test on mock data:** a real PostgreSQL database built from the draft schema, running inside your browser. Nothing is sent anywhere and no AI request is made.
-  - **Sample data** is generated from each column's name and type: names, emails, cities, prices, quantities, and dates spread over the last three years. Foreign keys point at real parent rows, tables that point to another table get 4 times as many rows, and about 1 parent in 5 gets no child rows, so "with no …" questions have answers. Set **Rows per table** and press **New sample data** for a fresh set (**Undo** brings the old one back).
-  - The **Sample data** tab shows the INSERT statements. Edit them to add the exact rows a test needs. Sketched types are changed to ones PostgreSQL accepts (`datetime` → `timestamp`, `money` → `numeric(12,2)`); open **Schema used for the mock database** to see the result.
+  - **Sample data** is generated from each column's name and type: names, emails, cities, prices, quantities, and dates spread over the last three years. Foreign keys point at real parent rows, tables that point to another table get 4 times as many rows, and about 1 parent in 5 gets no child rows, so "with no …" questions have answers. Set **Rows per table** and press **New sample data** for a fresh set (**Undo** brings the old one back). Tables you edited or imported are kept; only generated tables get new rows.
+  - The **Sample data** tab has two views:
+    - **Table:** pick a table and edit it like a spreadsheet (100 rows a page). An empty cell is NULL; Enter and ↑ ↓ move between rows. Cells are checked as you type: values that don't fit the column's type, empty NOT NULL cells, repeated keys, and references to rows that don't exist are marked, and **Show next** jumps to them. Columns that point to another table suggest its values. **Add row** gives a whole-number key the next number; **Regenerate** replaces one table with new generated rows; **Export CSV** downloads the table. The label next to the table says whether its rows are Generated, Edited or Imported.
+    - **SQL:** the same data as INSERT statements. Type here to use your own SQL instead (anything PostgreSQL accepts, such as UPDATEs or extra statements). The Table view then shows the result, read-only; **Use table editing** turns that result back into editable rows.
+  - **Import CSV** (in the Sample data tab) or **Add tables from CSV** (under the draft tables) reads one or more CSV files. For each file, choose:
+    - **An existing table:** columns are matched by name; replace the table's rows or add to them. Columns the file doesn't have are left empty.
+    - **A new table:** it's added to the draft schema, named after the file. Column types (whole number, decimal, date, timestamp, true/false, UUID, text), the primary key (`id` or `<table>_id` with all-different values) and references (`<other table>_id`) are guessed from the data and marked to check, like Extract's guesses. Numbers with leading zeros, like zip codes, stay text.
+    Comma, semicolon and tab separated files work, including Excel exports. The files never leave the browser, but a project Export includes the imported rows, and the page reminds you of that.
+  - Sketched types are changed to ones PostgreSQL accepts (`datetime` → `timestamp`, `money` → `numeric(12,2)`); open **Schema used for the mock database** to see the result.
   - **Query:** write SQL and press **Run** (Ctrl/⌘+Enter). Click a table name to see its rows. Anything a query changes (INSERT, UPDATE, DELETE, even DROP) is undone after the run, so every run starts from the same data. **Stop** ends a query that takes too long.
   - **Save as test** keeps the query and its current result. **Run all tests** runs them again and shows which ones now give a different result and how (for example *Expected 4 rows, got 5. New: (Nobody Here, Hanoi).*). Row order only counts when the query has `ORDER BY`. If the new result is right, press **Accept new result**.
   - On an Ask answer, **Run on mock data** runs its SQL here, and **Save as test** then names the test after the question.
@@ -171,12 +178,17 @@ js/
     ask-panel.js            the Ask panel UI, history, reusing saved answers
   mock/
     setup.js                sketched types → PostgreSQL types; CREATE TABLE and foreign-key steps
-    generate.js             sample data from column names and types (seeded, repeatable)
+    generate.js             sample data rows from column names and types (seeded, repeatable)
+    rows.js                 sample data as rows: INSERT statements, lining up with the draft, cell checks, CSV out
+    csv.js                  reading CSV files; guessing types, keys and references
+    sample.js               the shared sample data and engine state (used by the panels below)
     compare.js              tests: result fingerprints, comparing results, explaining differences
     saved.js                the mock database's part of a project, and cleaning it on load
     db.js                   starts and talks to the worker; the engine's CDN address and version
     worker.js               runs PostgreSQL (PGlite) in a background worker
-    mock-panel.js           the Test on mock data panel
+    mock-panel.js           the Test on mock data panel: status, query, tests
+    data-view.js            the Sample data tab: Table and SQL views
+    csv-import.js           the Import CSV dialog
   projects/
     db.js                   IndexedDB storage
     projects.js             autosave, project bar, Projects list, import/export
@@ -187,7 +199,7 @@ tests/                      node --test unit tests for the pure logic
 
 - **Shared state lives in `js/state.js`.** Modules read and change `state` there instead of keeping their own copies.
 - **Modules announce changes with events** instead of calling each other. For example, the editor emits `draft:edited` after a field changes; the export panel listens and refreshes, and the projects module listens for `dirty` and autosaves.
-- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js`, `diagram/layout.js` and `query/prompt.js`, `check.js`, `venn.js` and `mock/setup.js`, `generate.js`, `compare.js` never touch the page, which is why they can be tested with plain Node.
+- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js`, `diagram/layout.js` and `query/prompt.js`, `check.js`, `venn.js` and `mock/setup.js`, `generate.js`, `rows.js`, `csv.js`, `compare.js` never touch the page, which is why they can be tested with plain Node.
 
 ### Common changes
 
@@ -197,7 +209,8 @@ tests/                      node --test unit tests for the pure logic
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
 - **Change how questions are answered:** edit `askPrompt` (and `ASK_SCHEMA` if the shape changes) in `js/query/prompt.js`, then run `tests/query.test.js`.
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
-- **Change the sample data:** value rules (by column name and type) are in `js/mock/generate.js`, with tests in `tests/mock.test.js`.
+- **Change the sample data:** value rules (by column name and type) are in `js/mock/generate.js`, with tests in `tests/mock.test.js`; cell checks are in `js/mock/rows.js` (`tests/rows.test.js`).
+- **Change how CSV files are read or guessed:** `js/mock/csv.js`, with tests in `tests/csv.test.js`.
 - **Mock database engine:** PostgreSQL compiled to WebAssembly ([PGlite](https://pglite.dev)), loaded from cdn.jsdelivr.net at the version pinned in `js/mock/db.js`. To serve it from this site instead (for networks that block the CDN), copy every `.js` file (keep the `fs/` folder too) plus `pglite.wasm`, `pglite.data` and `initdb.wasm` from the `dist` folder of `@electric-sql/pglite` at that version into `js/vendor/pglite/` (about 17 MB; skip the `.map`, `.d.ts` and `.tar.gz` files), and set `PGLITE_URL` to `new URL("../vendor/pglite/index.js", import.meta.url).href`.
 - **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.
 - **Change how the diagram looks or is arranged:** card drawing is in `js/diagram/diagram.js`; sizes, arrangement and line routing are in `js/diagram/layout.js` (with tests in `tests/diagram.test.js`).
