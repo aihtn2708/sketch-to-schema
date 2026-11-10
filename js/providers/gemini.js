@@ -11,14 +11,14 @@ function thinkingFor(model) {
   return undefined;
 }
 
-async function request(key, dataUrl, prompt, model, signal) {
+async function request(key, { prompt, dataUrl, model, signal }) {
   const generationConfig = { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 16000 };
   const thinking = thinkingFor(model);
   if (thinking) generationConfig.thinkingConfig = thinking;
   let res;
   try {
     res = await postJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { "x-goog-api-key": key }, {
-      contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: dataUrl.split(",")[1] } }] }],
+      contents: [{ role: "user", parts: dataUrl ? [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: dataUrl.split(",")[1] } }] : [{ text: prompt }] }],
       generationConfig
     }, {
       signal,
@@ -57,6 +57,9 @@ export default {
   hint: `Free tier with daily limits; Google may use free-tier inputs to improve its products. Paid use is about $0.001–0.003 per extraction. Get a key at ${link("https://aistudio.google.com/apikey", "Google AI Studio")}.`,
 
   extract(key, dataUrl, { model, signal, onStatus }) {
-    return runPasses((prompt, m) => request(key, dataUrl, prompt, m, signal), { model, onStatus, label: "Gemini" });
+    return runPasses((prompt, m) => request(key, { prompt, dataUrl, model: m, signal }), { model, onStatus, label: "Gemini" });
+  },
+  ask(key, prompt, { model, signal }) {
+    return request(key, { prompt, model, signal });
   }
 };

@@ -44,7 +44,7 @@ Notes:
 
 ## Projects
 
-Everything on the page (the photo or drawing, the draft schema and the diagram layout) is saved as a **project** in your browser, automatically as you work.
+Everything on the page (the photo or drawing, the draft schema, the diagram layout and the questions you asked) is saved as a **project** in your browser, automatically as you work.
 
 - **New** starts a blank project. Rename it in the box at the top.
 - **Projects** lists your projects with a preview: open, duplicate, export or delete them, and search by name.
@@ -77,6 +77,15 @@ Projects live in this browser only. Clearing site data, or a private window, rem
   - **Editor:** edit tables and columns, and check flags.
   - **Diagram:** the draft as table cards with relationship lines, like dbdiagram.io. `*` marks the column holding the reference and `1` the column it points to; key icons mark primary keys and amber marks columns to check. Drag tables to move them (positions are saved with the project), drag the background to move around, Ctrl/⌘ + scroll to zoom, **Arrange** to lay everything out again, and double-click a table to edit it. **SVG** and **PNG** download the diagram.
 - Copy **PostgreSQL DDL** or **DBML** from Export.
+- **Ask in plain language:** type a question about the data, for example *inventory items that have had no transactions over the past two years*, pick the SQL dialect, and press **Ask** (or Ctrl/⌘+Enter). It uses the same AI connection as Extract.
+  - The SQL is written from the current draft schema only. Any table or column it uses that isn't in the draft is listed as a warning, and anything the question needs but the schema doesn't have is listed under **Not in your schema**.
+  - When the question compares groups of rows (with / without, both, either), a **Venn diagram** shows which part the query returns and names the matching join: for example "Only in A" is an anti-join (`NOT EXISTS`).
+  - The chips under the box are starter questions made from the draft's relationships. They cost nothing until you press Ask.
+  - Answers are saved with the project. Asking the same question again shows the saved answer without a request; **Ask again** gets a fresh one. If the draft changed since, the answer says so.
+
+### Requests per day
+
+Each Extract is 1 request (up to 4 for a very large diagram), and each new question is 1 request. Nothing else calls the AI: editing, the diagram, export, starter questions and saved answers are all free. The AI connection panel shows how many requests this browser has made today, so a team can see it staying well under 100 a day.
 
 Typed text in Draw mode is much easier for the models to read than mouse handwriting, so prefer the Text tool for names.
 
@@ -94,7 +103,7 @@ Then open http://localhost:8000. In the browser console, `s2s.state` shows the a
 
 ### Run the tests
 
-The tests cover the logic that doesn't need a browser: reading model replies, building the draft, DDL/DBML export, and checking saved drawings. They need Node.js 20 or newer and nothing else:
+The tests cover the logic that doesn't need a browser: reading model replies, building the draft, DDL/DBML export, checking saved drawings, and the Ask prompt, SQL check and Venn diagram. They need Node.js 20 or newer and nothing else:
 
 ```bash
 node --test "tests/*.test.js"    # or: npm test
@@ -115,6 +124,7 @@ js/
   icons.js                  toolbar icons
   connection.js             AI connection panel: provider, key, model
   extract.js                the Extract button: sketch → provider → draft
+  usage.js                  counts requests made today in this browser
   providers/
     index.js                list of providers (the Provider menu is built from it)
     prompt.js               the prompt, the reply's JSON shape, reply parsing, rescuing cut-off replies
@@ -136,6 +146,11 @@ js/
   diagram/
     layout.js               card sizes, relationships, auto-arrange, connector paths (pure, tested)
     diagram.js              the Diagram view: drawing, dragging, zoom, SVG/PNG download
+  query/
+    prompt.js               Ask in plain language: schema text, prompt, answer shape, starter questions
+    check.js                finds tables and columns in the SQL that aren't in the draft
+    venn.js                 Venn diagram drawing and join names
+    ask-panel.js            the Ask panel UI, history, reusing saved answers
   projects/
     db.js                   IndexedDB storage
     projects.js             autosave, project bar, Projects list, import/export
@@ -146,14 +161,15 @@ tests/                      node --test unit tests for the pure logic
 
 - **Shared state lives in `js/state.js`.** Modules read and change `state` there instead of keeping their own copies.
 - **Modules announce changes with events** instead of calling each other. For example, the editor emits `draft:edited` after a field changes; the export panel listens and refreshes, and the projects module listens for `dirty` and autosaves.
-- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js` and `diagram/layout.js` never touch the page, which is why they can be tested with plain Node.
+- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js`, `diagram/layout.js` and `query/prompt.js`, `check.js`, `venn.js` never touch the page, which is why they can be tested with plain Node.
 
 ### Common changes
 
-- **Add an AI provider:** copy `js/providers/gemini.js` to a new file, change its fields and `extract()`, then add it to the list in `js/providers/index.js`. The Provider menu updates itself.
+- **Add an AI provider:** copy `js/providers/gemini.js` to a new file, change its fields, `extract()` and `ask()`, then add it to the list in `js/providers/index.js`. The Provider menu updates itself.
 - **Change default models or hints:** edit that provider's file.
 - **Large diagrams:** each request allows up to 16,000 reply tokens and asks the model to think as little as possible, since thinking uses the same reply space. If a reply is still cut off, the complete tables are kept and the model is asked for only the rest, up to 4 parts (`js/providers/passes.js`). If tables are still missing after that, a warning above the draft says so.
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
+- **Change how questions are answered:** edit `askPrompt` (and `ASK_SCHEMA` if the shape changes) in `js/query/prompt.js`, then run `tests/query.test.js`.
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
 - **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.
 - **Change how the diagram looks or is arranged:** card drawing is in `js/diagram/diagram.js`; sizes, arrangement and line routing are in `js/diagram/layout.js` (with tests in `tests/diagram.test.js`).

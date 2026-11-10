@@ -1,4 +1,4 @@
-// One request in the Chat Completions format, shared by OpenAI and DeepSeek.
+// One request in the Chat Completions format, shared by OpenAI and DeepSeek. dataUrl is optional (text-only questions).
 // Returns { text, truncated, model } for runPasses().
 import { postJson, apiError, ProviderError } from "./http.js";
 
@@ -7,7 +7,7 @@ export async function chatRequest({ url, key, model, dataUrl, prompt, signal, la
   try {
     res = await postJson(url, { Authorization: `Bearer ${key}` }, {
       model,
-      messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
+      messages: [{ role: "user", content: dataUrl ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] : prompt }],
       ...body
     }, { signal, fallbacks });
   } catch (e) {

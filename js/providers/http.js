@@ -1,7 +1,10 @@
 // Shared request helpers for provider files.
 //
-// Every provider exports extract(key, dataUrl, { model, signal, onStatus }) and returns
-// { result: <compact JSON>, model, parts, incomplete? }, or throws an Error with a message for the user.
+// Every provider exports:
+//   extract(key, dataUrl, { model, signal, onStatus }) → { result: <compact JSON>, model, parts, incomplete? }
+//   ask(key, prompt, { model, signal, schema })         → { text, truncated, model }   (text only, no image)
+// and throws an Error with a message for the user.
+import { countRequest } from "../usage.js";
 
 // An error with a message for the user. fatal = trying another model won't help (bad key, no credit, daily limit).
 export class ProviderError extends Error {
@@ -28,6 +31,7 @@ export async function postJson(url, headers, body, { signal, fallbacks = [] } = 
   const left = [...fallbacks];
   let b = body;
   for (;;) {
+    countRequest();
     const res = await fetch(url, { method: "POST", signal, headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(b) });
     if (res.status !== 400 || !left.length) return res;
     const detail = await apiError(res.clone());

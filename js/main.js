@@ -8,6 +8,7 @@ import { redraw } from "./sketch/board.js";
 import "./sketch/draw-tools.js";
 import "./diagram/diagram.js";
 import "./extract.js";
+import "./query/ask-panel.js";
 import { initProjects } from "./projects/projects.js";
 import { state } from "./state.js";
 

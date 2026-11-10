@@ -19,6 +19,7 @@ export const state = {
   textSize: 30,                            // size of new text on the board
   photo: { img: null, data: null, name: EXAMPLE_PHOTO_NAME },  // img null = show the example whiteboard
   diagram: { pos: {} },                    // Diagram view: table positions, by table id
+  queries: [],                             // Ask in plain language: saved questions and answers, newest first
   project: null                            // the open project record
 };
 

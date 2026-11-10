@@ -146,3 +146,44 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 .dg-wrap svg { display: block; width: 100%; height: 100%; }
 .dg-table { cursor: move; }
 .dg-empty { position: absolute; inset: 50% 16px auto; transform: translateY(-50%); border: 0; }
+
+/* Ask in plain language */
+.ask-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .ask-grid { grid-template-columns: minmax(0, 1fr); } }
+.ask-side, .ask-answer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.sql-block, .venn-card > * { min-width: 0; }
+.ask-input { resize: vertical; min-height: 84px; font-family: var(--font-ui); font-size: 15px; line-height: 1.45; }
+.ask-dialect { width: auto; }
+.eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12.5px; padding: 4px 11px; border-radius: 999px; background: var(--sunk); color: var(--ink); font-weight: 500; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 280px; overflow: auto; }
+.hist li { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.hist .hq { flex: 1; min-width: 0; display: block; text-align: left; border-color: transparent; background: transparent; padding: 6px 8px; font-size: 13.5px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist .hq:hover { background: var(--sunk); }
+.hist li.current .hq { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.hist .hdel { width: 28px; height: 28px; font-size: 16px; }
+.ans-head { display: grid; gap: 4px; }
+.ans-q { margin: 0; font-size: 16px; font-weight: 600; text-wrap: balance; }
+.ans-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.ans-meta .quiet { font-size: 12.5px; padding: 3px 6px; }
+.ans-expl { margin: 0; max-width: 72ch; }
+.ans-list { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13.5px; }
+.note-box { margin: 0; font-size: 13.5px; padding: 9px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--sunk); }
+.note-box.warn { background: var(--check-bg); border-color: var(--check-line); }
+.note-box code, .venn-sets code { font-family: var(--font-code); font-size: 12.5px; }
+.venn-card { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 18px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+@media (max-width: 640px) { .venn-card { grid-template-columns: minmax(0, 1fr); } }
+.venn-fig svg { display: block; width: 100%; height: auto; max-width: 320px; }
+.venn-text { display: grid; gap: 6px; font-size: 13.5px; min-width: 0; }
+.venn-text b { font-size: 15px; }
+.venn-join { font-family: var(--font-code); font-size: 12.5px; color: var(--accent); }
+.venn-sets { margin: 2px 0 0; display: grid; gap: 4px; }
+.venn-sets div { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; }
+.venn-sets dt { font-weight: 700; }
+.venn-sets dd { margin: 0; overflow-wrap: anywhere; }
+.sql-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sql-head .eyebrow { margin: 0; }
+.sql-block .code { max-height: 420px; }
+.kw { color: var(--accent); font-weight: 600; }

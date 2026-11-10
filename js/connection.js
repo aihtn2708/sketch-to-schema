@@ -2,6 +2,7 @@
 // Keys stay in this browser (localStorage when "Remember" is on, otherwise memory only).
 import { $, esc, store, showMsg } from "./util.js";
 import { PROVIDERS } from "./providers/index.js";
+import { requestsToday, onUsage } from "./usage.js";
 
 let current = PROVIDERS[store.get("s2s.provider")] ? store.get("s2s.provider") : "openrouter";
 const sessionKeys = {};
@@ -21,7 +22,10 @@ export function active() {
 export function updateConnStatus() {
   const P = PROVIDERS[current], has = !!keyFor(current), m = modelFor(current);
   $("#connDot").classList.toggle("on", has);
-  $("#connText").textContent = has ? `Ready · ${P.name} · ${P.statusModel ? P.statusModel(m) : m}` : "Add a key to enable Extract";
+  const n = requestsToday();
+  $("#connText").textContent = (has ? `Ready · ${P.name} · ${P.statusModel ? P.statusModel(m) : m}` : "Add a key to enable Extract")
+    + ` · ${n} request${n === 1 ? "" : "s"} today`;
+  $("#connText").title = "AI requests sent from this browser today, by all features together";
   $("#extractBtn").disabled = !has;
 }
 
@@ -38,6 +42,8 @@ export function renderConn() {
   $("#provHint").innerHTML = P.hint;
   updateConnStatus();
 }
+
+onUsage(updateConnStatus);
 
 // The Provider menu is built from the provider list, so adding a provider needs no HTML change.
 $("#provider").innerHTML = Object.values(PROVIDERS).map((p) => `<option value="${p.id}">${esc(p.menuLabel)}</option>`).join("");

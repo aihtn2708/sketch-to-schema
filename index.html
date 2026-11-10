@@ -180,6 +180,34 @@
         </div>
       </div>
     </section>
+
+    <section class="panel" id="askPanel" aria-labelledby="askTitle">
+      <div class="panel-head">
+        <h2 id="askTitle">Ask in plain language</h2>
+        <span class="hint">SQL written from your draft schema · 1 request per new question</span>
+      </div>
+      <div class="panel-body ask-grid">
+        <div class="ask-side">
+          <label class="field" for="askInput">
+            <span>Question</span>
+            <textarea class="in ask-input" id="askInput" rows="3" placeholder="For example: inventory items that have had no transactions in the past two years"></textarea>
+          </label>
+          <div class="actions">
+            <label class="hint" for="askDialect">SQL dialect</label>
+            <select class="in ask-dialect" id="askDialect"></select>
+            <button type="button" class="primary" id="askBtn">Ask</button>
+            <button type="button" class="quiet" id="askStop" hidden>Stop</button>
+          </div>
+          <div class="chips" id="askChips" aria-label="Suggested questions"></div>
+          <p class="msg" id="askMsg" role="status" hidden></p>
+          <div id="askHistoryWrap" hidden>
+            <p class="eyebrow">Asked in this project</p>
+            <ul class="hist" id="askHistory"></ul>
+          </div>
+        </div>
+        <div class="ask-answer" id="askAnswer" aria-live="polite"></div>
+      </div>
+    </section>
   </div>
 </div>
 

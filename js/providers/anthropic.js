@@ -4,9 +4,12 @@ import { runPasses } from "./passes.js";
 import { postJson, apiError, ProviderError, capTokens } from "./http.js";
 import { link } from "../util.js";
 
-async function request(key, dataUrl, prompt, model, signal) {
-  const [meta, data] = dataUrl.split(",");
-  const media = meta.match(/data:(.*?);/)[1];
+async function request(key, { prompt, dataUrl, model, signal, schema = SCHEMA }) {
+  const content = [{ type: "text", text: prompt }];
+  if (dataUrl) {
+    const [meta, data] = dataUrl.split(",");
+    content.unshift({ type: "image", source: { type: "base64", media_type: meta.match(/data:(.*?);/)[1], data } });
+  }
   let res;
   try {
     res = await postJson("https://api.anthropic.com/v1/messages", {
@@ -15,11 +18,8 @@ async function request(key, dataUrl, prompt, model, signal) {
       "anthropic-dangerous-direct-browser-access": "true"
     }, {
       model, max_tokens: 16000,
-      output_config: { format: { type: "json_schema", schema: SCHEMA } },
-      messages: [{ role: "user", content: [
-        { type: "image", source: { type: "base64", media_type: media, data } },
-        { type: "text", text: prompt }
-      ] }]
+      output_config: { format: { type: "json_schema", schema } },
+      messages: [{ role: "user", content }]
     }, { signal, fallbacks: [capTokens("max_tokens", 8000)] });
   } catch (e) {
     if (e?.name === "AbortError") throw e;
@@ -47,6 +47,9 @@ export default {
   hint: `Paid, about $0.001 per extraction with Haiku. Get a key at ${link("https://platform.claude.com/settings/keys", "platform.claude.com")} and set a monthly spend limit there.`,
 
   extract(key, dataUrl, { model, signal, onStatus }) {
-    return runPasses((prompt, m) => request(key, dataUrl, prompt, m, signal), { model, onStatus, label: "Claude" });
+    return runPasses((prompt, m) => request(key, { prompt, dataUrl, model: m, signal }), { model, onStatus, label: "Claude" });
+  },
+  ask(key, prompt, { model, signal, schema }) {
+    return request(key, { prompt, model, signal, schema });
   }
 };
