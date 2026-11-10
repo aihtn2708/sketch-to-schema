@@ -63,7 +63,12 @@ The page has three tabs, one function at a time. It always opens on the first:
 
 The tabs stay at the top of the window as you scroll. **Run on mock data** on an Ask answer switches to Test on mock data.
 
-On the Ask and Test tabs, the **schema** stays in view on the left: every table with its columns, types, keys (PK) and references (→), and a dot on anything marked to check. Filter it by name, fold tables you don't need, and click a table or column name to insert it at the cursor in the question or the SQL query. **Schema** at the right of the tab bar hides or shows it (remembered), and **Edit in Sketch to schema** goes back to change it.
+On the Ask and Test tabs, the **schema** stays in view on the left, as a **List** or a **Diagram**:
+
+- **List:** every table with its columns, types, keys (PK) and references (→), and a dot on anything marked to check. Fold tables you don't need.
+- **Diagram:** the same diagram as in Sketch to schema, with the same layout (Arrange it there). Drag to move around, Ctrl/⌘ + scroll to zoom, **Fit** to see it all; pointing at a table highlights its relationships.
+- In both, the filter box narrows things down by name (the diagram fades tables that don't match), and clicking a table or column name inserts it at the cursor in the question or the SQL query.
+- Drag the sidebar's right edge to make it wider or narrower (double-click the edge to reset). **Schema** at the right of the tab bar hides or shows it, and **Edit in Sketch to schema** goes back to change it. The view, width and shown/hidden are remembered.
 
 - **AI connection** folds down to one status line once a key is saved. Click it to change the provider, key or model.
 - **Photo:** upload, drag in, or paste (Ctrl/⌘+V) a photo of the diagram.
@@ -169,7 +174,7 @@ js/
     model.js                model reply → draft tables; draft stats; checking saved drafts
     export.js               draft → PostgreSQL DDL and DBML
     editor.js               the draft editor UI
-    schema-side.js          the schema sidebar on the Ask and Test tabs
+    schema-side.js          the schema sidebar on the Ask and Test tabs: list, diagram, inserting names
     export-panel.js         the Export panel (tabs, Copy)
   diagram/
     layout.js               card sizes, relationships, auto-arrange, connector paths (pure, tested)

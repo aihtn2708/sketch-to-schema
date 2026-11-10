@@ -25,7 +25,7 @@ h1 { font-size: clamp(26px, 3.2vw, 34px); line-height: 1.1; margin: 0; letter-sp
 .ws-tab .tab-count { font-weight: 500; }
 .ws-view { display: grid; gap: 20px; min-width: 0; }
 /* Ask and Test: the schema on the left, the work on the right. */
-.ws-work { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
+.ws-work { display: grid; grid-template-columns: var(--side-w, 270px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .ws-work.no-side { grid-template-columns: minmax(0, 1fr); }
 .ws-work.no-side .schema-side { display: none; }
 .ws-main { display: grid; gap: 20px; min-width: 0; }

@@ -204,15 +204,28 @@
   <aside class="panel schema-side" id="schemaSide" aria-labelledby="schemaSideTitle">
     <div class="side-head">
       <h2 id="schemaSideTitle">Schema</h2>
-      <span class="hint" id="schemaSideCount"></span>
+      <div class="seg side-mode" role="tablist" aria-label="Schema view">
+        <button type="button" role="tab" id="sideList" aria-selected="true" aria-controls="schemaList">List</button>
+        <button type="button" role="tab" id="sideDiagram" aria-selected="false" aria-controls="sideDgWrap">Diagram</button>
+      </div>
       <button type="button" class="icon-btn" id="schemaSideClose" aria-label="Hide the schema" title="Hide the schema">×</button>
     </div>
     <input class="in side-filter" id="schemaFilter" type="search" placeholder="Filter tables and columns" aria-label="Filter tables and columns" spellcheck="false">
     <div class="side-list" id="schemaList"></div>
+    <div class="side-dg-wrap" id="sideDgWrap" hidden>
+      <div class="toolbar side-dg-bar" role="toolbar" aria-label="Diagram view">
+        <button type="button" class="tool" id="sideDgFit" data-icon="fit" title="Show the whole diagram"><span class="lbl">Fit</span></button>
+        <button type="button" class="tool" id="sideDgOut" data-icon="zoomOut" aria-label="Zoom out" title="Zoom out (Ctrl + scroll)"></button>
+        <span class="zoom-val" id="sideDgZoom" aria-live="polite">100%</span>
+        <button type="button" class="tool" id="sideDgIn" data-icon="zoomIn" aria-label="Zoom in" title="Zoom in (Ctrl + scroll)"></button>
+      </div>
+      <div class="side-dg" id="sideDg"><svg id="sideDgSvg" role="img" aria-label="Diagram of the draft schema"></svg><p class="side-empty" id="sideDgEmpty" hidden>No tables yet. Extract or add them in Sketch to schema.</p></div>
+    </div>
     <div class="side-foot">
-      <p class="hint" id="schemaInsertHint">Click a name to put it in the question.</p>
+      <p class="hint"><span id="schemaSideCount"></span> <span id="schemaInsertHint">Click a name to put it in the question.</span></p>
       <button type="button" class="quiet" id="schemaEdit">Edit in Sketch to schema</button>
     </div>
+    <div class="side-resize" id="sideResize" role="separator" aria-orientation="vertical" aria-label="Resize the schema" tabindex="0" title="Drag to resize · double-click to reset"></div>
   </aside>
   <div class="ws-main">
   <div class="ws-view" id="viewAsk" role="tabpanel" aria-labelledby="wsAsk" hidden>

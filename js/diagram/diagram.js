@@ -49,7 +49,8 @@ function prepare() {
   state.diagram.pos = placeMissing(tables, sizes, pos);
 }
 
-function cardSvg(t, p, c) {
+// opts (for other views of the diagram): dim = table ids to fade, hits = clickable name areas.
+function cardSvg(t, p, c, opts = {}) {
   const { w, h } = sizes[t.id];
   const isHot = hot === t.id;
   let rows = "";
@@ -62,7 +63,11 @@ function cardSvg(t, p, c) {
     rows += `<text x="${w - PAD_X}" y="${mid}" dominant-baseline="central" text-anchor="end" font-family="${MONO}" font-size="12" fill="${c.muted}"${col.typeGuessed ? ' font-style="italic"' : ""}>${esc(col.type || "text")}</text>`;
   });
   if (!t.columns.length) rows = `<text x="${PAD_X}" y="${HEAD_H + ROW_H / 2}" dominant-baseline="central" font-family="${SANS}" font-size="12" fill="${c.muted}">No columns</text>`;
-  return `<g class="dg-table" data-id="${esc(t.id)}" transform="translate(${p.x},${p.y})">
+  if (opts.hits) {
+    rows += `<rect class="dg-hit" data-insert="${esc(t.name || "untitled")}" width="${w}" height="${HEAD_H}" fill="transparent"><title>${esc(t.name || "untitled")}</title></rect>`;
+    t.columns.forEach((col, i) => { rows += `<rect class="dg-hit" data-insert="${esc(col.name || "untitled")}" y="${HEAD_H + i * ROW_H}" width="${w}" height="${ROW_H}" fill="transparent"><title>${esc(col.name || "untitled")} ${esc(col.type || "text")}</title></rect>`; });
+  }
+  return `<g class="dg-table" data-id="${esc(t.id)}" transform="translate(${p.x},${p.y})"${opts.dim?.has(t.id) ? ' opacity="0.28"' : ""}>
     <rect width="${w}" height="${h}" rx="8" fill="${c.card}" stroke="${isHot ? c.accent : c.line}" stroke-width="${isHot ? 1.6 : 1}"/>
     <path d="M0,8 a8,8 0 0 1 8,-8 h${w - 16} a8,8 0 0 1 8,8 v${HEAD_H - 8} h-${w} z" fill="${t.flags.length ? c.check : c.accent}"/>
     <text x="${PAD_X}" y="${HEAD_H / 2}" dominant-baseline="central" font-family="${SANS}" font-size="14" font-weight="600" fill="${c.accentInk}">${esc(t.name || "untitled")}</text>
@@ -70,7 +75,7 @@ function cardSvg(t, p, c) {
   </g>`;
 }
 
-function edgesSvg(c) {
+function edgesSvg(c, opts = {}) {
   const pos = state.diagram.pos;
   let out = "";
   for (const r of relations(state.schema.tables)) {
@@ -80,16 +85,29 @@ function edgesSvg(c) {
     const color = lit ? c.accent : c.muted;
     // "*" = many (the column holding the foreign key), "1" = the column it references.
     const label = (pt, text) => `<text x="${pt.x + pt.dir * 9}" y="${pt.y - 7}" text-anchor="${pt.dir > 0 ? "start" : "end"}" font-family="${SANS}" font-size="12" font-weight="600" fill="${color}">${text}</text>`;
-    out += `<g class="dg-edge"><path d="${g.d}" fill="none" stroke="${color}" stroke-width="${lit ? 2.2 : 1.5}"/>`
+    const faded = opts.dim && (opts.dim.has(r.from.t) || opts.dim.has(r.to.t));
+    out += `<g class="dg-edge"${faded ? ' opacity="0.25"' : ""}><path d="${g.d}" fill="none" stroke="${color}" stroke-width="${lit ? 2.2 : 1.5}"/>`
       + `<circle cx="${g.a.x}" cy="${g.a.y}" r="2.6" fill="${color}"/><circle cx="${g.b.x}" cy="${g.b.y}" r="2.6" fill="${color}"/>`
       + label(g.a, "*") + label(g.b, "1") + `</g>`;
   }
   return out;
 }
 
-function contentSvg(c) {
+function contentSvg(c, opts = {}) {
   const pos = state.diagram.pos;
-  return `<g>${edgesSvg(c)}</g><g>${state.schema.tables.map((t) => cardSvg(t, pos[t.id], c)).join("")}</g>`;
+  return `<g>${edgesSvg(c, opts)}</g><g>${state.schema.tables.map((t) => cardSvg(t, pos[t.id], c, opts)).join("")}</g>`;
+}
+
+// The same diagram for another view (the schema sidebar): same cards, positions and colors.
+// → { content (SVG markup in diagram coordinates), bounds }
+export function diagramParts({ hot: h = null, dim = null, hits = false } = {}) {
+  if (!state.schema.tables.length) return { content: "", bounds: null };
+  prepare();
+  const keep = hot;
+  hot = h;
+  const content = contentSvg(palette(), { dim, hits });
+  hot = keep;
+  return { content, bounds: bounds(state.schema.tables, state.diagram.pos, sizes) };
 }
 
 export function renderDiagram() {
