@@ -16,7 +16,7 @@
 <div class="wrap">
   <header>
     <h1>Sketch to Schema</h1>
-    <p class="lede">Upload a photo of a whiteboard ER diagram, or draw one here. An AI model drafts the tables; you check anything it marked, then copy PostgreSQL DDL or DBML.</p>
+    <p class="lede">Upload a photo of a whiteboard ER diagram, or draw one here. An AI model drafts the tables; you check anything it marked, then copy PostgreSQL DDL or DBML, ask for SQL in plain language, and test it on mock data.</p>
   </header>
 
   <!-- Project: everything on this page is saved as a project in this browser -->
@@ -206,6 +206,66 @@
           </div>
         </div>
         <div class="ask-answer" id="askAnswer" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="mockPanel" aria-labelledby="mockTitle">
+      <div class="panel-head">
+        <h2 id="mockTitle">Test on mock data</h2>
+        <span class="hint">PostgreSQL running in your browser · no AI requests</span>
+      </div>
+      <div class="panel-body mock-grid">
+        <div class="mock-side">
+          <div class="db-status" role="status"><span class="dot" id="dbDot"></span><span id="dbText">Not started</span></div>
+          <div>
+            <p class="eyebrow">Tables</p>
+            <ul class="mock-tables" id="mockTables"></ul>
+          </div>
+          <div class="mock-gen field">
+            <label for="mockRows"><span>Rows per table</span></label>
+            <div class="actions">
+              <input class="in rows-in" id="mockRows" type="number" min="1" max="500" step="1" inputmode="numeric">
+              <button type="button" id="mockGen" data-icon="refresh">New sample data</button>
+            </div>
+          </div>
+          <p class="hint">Tables that point to another table get 4 times as many rows, and about 1 parent in 5 is left without any, so “with no …” questions have answers.</p>
+          <p class="msg" id="mockGenMsg" role="status" hidden></p>
+        </div>
+        <div class="mock-main">
+          <div class="seg" role="tablist" aria-label="Mock database view">
+            <button type="button" role="tab" id="mtQuery" aria-selected="true" aria-controls="mvQuery">Query</button>
+            <button type="button" role="tab" id="mtData" aria-selected="false" aria-controls="mvData">Sample data</button>
+            <button type="button" role="tab" id="mtTests" aria-selected="false" aria-controls="mvTests">Tests <span class="tab-count" id="testCount"></span></button>
+          </div>
+          <div class="mock-view" id="mvQuery" role="tabpanel" aria-labelledby="mtQuery">
+            <textarea class="in code-in" id="mockSql" rows="7" spellcheck="false" autocomplete="off" aria-label="SQL query" placeholder="SELECT * FROM customer LIMIT 10;"></textarea>
+            <div class="actions">
+              <button type="button" class="primary" id="mockRun" data-icon="play">Run</button>
+              <button type="button" class="quiet" id="mockStop" hidden data-icon="stop">Stop</button>
+              <button type="button" id="mockSave" data-icon="checks">Save as test</button>
+              <span class="hint">Ctrl/⌘+Enter runs. Anything the query changes is undone after the run.</span>
+            </div>
+            <p class="msg" id="mockMsg" role="status" hidden></p>
+            <div class="mock-result" id="mockResult" aria-live="polite"></div>
+          </div>
+          <div class="mock-view" id="mvData" role="tabpanel" aria-labelledby="mtData" hidden>
+            <p class="note-box warn" id="dataNote" hidden></p>
+            <textarea class="in code-in data-in" id="mockData" rows="18" spellcheck="false" autocomplete="off" aria-label="Sample data SQL"></textarea>
+            <p class="hint">These INSERT statements load the mock database. Edit them to add the rows your tests need; the database is rebuilt on the next run.</p>
+            <details class="setup-details">
+              <summary>Schema used for the mock database</summary>
+              <ul class="ans-list" id="typeNotes"></ul>
+              <pre class="code" id="mockSetup"></pre>
+            </details>
+          </div>
+          <div class="mock-view" id="mvTests" role="tabpanel" aria-labelledby="mtTests" hidden>
+            <div class="actions">
+              <button type="button" class="primary" id="testsRun" data-icon="play">Run all tests</button>
+              <span class="summary" id="testsSummary"></span>
+            </div>
+            <ul class="tests" id="testsList"></ul>
+          </div>
+        </div>
       </div>
     </section>
   </div>

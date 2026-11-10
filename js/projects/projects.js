@@ -8,6 +8,7 @@ import { setMode, syncBoardControls, boardThumbnail } from "../sketch/board.js";
 import { loadImage } from "../sketch/image.js";
 import { cleanPositions } from "../diagram/layout.js";
 import { cleanQueries } from "../query/prompt.js";
+import { cleanMock, defaultMock } from "../mock/saved.js";
 import { EXAMPLE_DRAFT } from "../sketch/example.js";
 import { svgIcon } from "../icons.js";
 
@@ -42,6 +43,7 @@ function currentRecord() {
     draft: { tables: state.schema.tables, warnings: state.schema.warnings }, original: state.original,
     diagram: { pos: state.diagram.pos },
     queries: state.queries,
+    mock: state.mock,
     tableCount: state.schema.tables.length, thumb: boardThumbnail()
   };
 }
@@ -76,7 +78,7 @@ function blankProject(name) {
   const now = Date.now();
   return { id: newId(), name, createdAt: now, updatedAt: now, mode: "draw", photo: null, photoName: null,
     drawing: { shapes: [] }, draft: { tables: [], warnings: [] },
-    original: {}, diagram: { pos: {} }, queries: [], tableCount: 0, thumb: null };
+    original: {}, diagram: { pos: {} }, queries: [], mock: defaultMock(), tableCount: 0, thumb: null };
 }
 
 async function uniqueName(base) {
@@ -100,6 +102,7 @@ async function loadProject(p) {
     state.original = p.original && typeof p.original === "object" ? p.original : {};
     state.diagram = { pos: cleanPositions(p.diagram?.pos) };
     state.queries = cleanQueries(p.queries);
+    state.mock = cleanMock(p.mock);
     emit("project:loaded");
     emit("draft:replaced");
     setMode(p.mode === "draw" ? "draw" : "photo");
@@ -156,6 +159,7 @@ $("#importFile").addEventListener("change", async (e) => {
     drawing: { shapes: cleanShapes(ip.drawing?.shapes) },
     diagram: { pos: cleanPositions(ip.diagram?.pos) },
     queries: cleanQueries(ip.queries),
+    mock: cleanMock(ip.mock),
     draft: { tables: cleanDraft(ip.draft?.tables), warnings: (Array.isArray(ip.draft?.warnings) ? ip.draft.warnings : []).map(String) },
     original: ip.original && typeof ip.original === "object" ? ip.original : {}, createdAt: now, updatedAt: now
   };

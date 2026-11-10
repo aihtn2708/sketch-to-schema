@@ -187,3 +187,51 @@ dialog.proj-dialog::backdrop { background: rgb(10 20 18 / .45); }
 .sql-head .eyebrow { margin: 0; }
 .sql-block .code { max-height: 420px; }
 .kw { color: var(--accent); font-weight: 600; }
+
+/* Test on mock data */
+.mock-grid { display: grid; grid-template-columns: minmax(200px, 3fr) minmax(0, 9fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .mock-grid { grid-template-columns: minmax(0, 1fr); } }
+.mock-side, .mock-main, .mock-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.mock-view[hidden] { display: none; }
+.db-status { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 8px 10px; border-radius: var(--r); background: var(--sunk); border: 1px solid var(--line); }
+.db-status .dot.busy { background: var(--accent); animation: pulse 1s ease-in-out infinite alternate; }
+.db-status .dot.err { background: var(--danger); }
+@keyframes pulse { from { opacity: 1; } to { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .db-status .dot.busy { animation: none; } }
+.mock-tables { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mock-tables button { width: 100%; justify-content: space-between; border-color: transparent; background: transparent; padding: 6px 8px; font-size: 13.5px; font-weight: 400; }
+.mock-tables button:hover { background: var(--sunk); }
+.mock-tables .tn { font-family: var(--font-code); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mock-tables .tc { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mock-gen label > span { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.rows-in { width: 80px; }
+.code-in { font-family: var(--font-code); font-size: 13px; line-height: 1.55; resize: vertical; tab-size: 2; white-space: pre; overflow: auto; }
+.data-in { min-height: 300px; }
+.tab-count { font-variant-numeric: tabular-nums; color: var(--muted); }
+.res-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+.res-meta b { color: var(--ink); font-weight: 600; }
+.res-wrap { overflow: auto; max-height: 440px; border: 1px solid var(--line); border-radius: var(--r); }
+table.res { border-collapse: collapse; font-family: var(--font-code); font-size: 12.5px; width: max-content; min-width: 100%; }
+table.res th, table.res td { padding: 5px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+table.res th { position: sticky; top: 0; background: var(--sunk); font-weight: 600; z-index: 1; }
+table.res .n { width: 1%; color: var(--muted); text-align: right; user-select: none; }
+table.res tr:last-child td { border-bottom: 0; }
+.null { color: var(--muted); font-style: italic; }
+.err-box { margin: 0; font-size: 13.5px; padding: 10px 12px; border-radius: var(--r); border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--ink); display: grid; gap: 4px; }
+.err-box b { color: var(--danger); }
+.setup-details summary { cursor: pointer; font-size: 13.5px; color: var(--muted); }
+.setup-details[open] summary { margin-bottom: 8px; }
+.setup-details .ans-list { margin-bottom: 8px; }
+.setup-details .lh { list-style: none; margin-left: -18px; color: var(--muted); }
+.tests { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.test { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.test.fail { border-color: var(--check-line); background: var(--check-bg); }
+.test-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.test-name { flex: 1 1 200px; font-weight: 600; border-color: transparent; background: transparent; }
+.test-name:hover, .test-name:focus { border-color: var(--line); background: var(--surface); }
+.test-acts { display: flex; gap: 4px; flex-wrap: wrap; }
+.test-acts button { padding: 5px 9px; font-size: 13px; }
+.test-meta { font-size: 12.5px; color: var(--muted); }
+.test-why { margin: 0; font-size: 13.5px; }
+.test-sql { margin: 0; font-family: var(--font-code); font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 3.2em; overflow: hidden; }
+.pill.fail { background: var(--check-bg); border-color: var(--check-line); color: var(--danger); }

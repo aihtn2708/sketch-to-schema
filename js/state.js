@@ -8,6 +8,9 @@
 //   "dirty"           something worth saving changed → the project autosaves
 //   "text:commit"     finish any text box being typed on the board (before switching modes, extracting, saving)
 //   "project:loaded"  a project was opened → the drawing's undo history resets
+//   "mock:run"        run SQL on the mock database ({ sql, name, dialect }), e.g. from an Ask answer
+
+import { defaultMock } from "./mock/saved.js";
 
 export const EXAMPLE_PHOTO_NAME = "Example whiteboard (shop schema)";
 
@@ -20,6 +23,7 @@ export const state = {
   photo: { img: null, data: null, name: EXAMPLE_PHOTO_NAME },  // img null = show the example whiteboard
   diagram: { pos: {} },                    // Diagram view: table positions, by table id
   queries: [],                             // Ask in plain language: saved questions and answers, newest first
+  mock: defaultMock(),                     // Test on mock data: sample data script, query, tests
   project: null                            // the open project record
 };
 

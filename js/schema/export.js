@@ -8,6 +8,8 @@ const q = (n) => (/^[a-z_][a-z0-9_]*$/.test(n) && !RESERVED.has(n) ? n : `"${Str
 const tName = (t) => t.name.trim() || "untitled_table";
 const cName = (c) => c.name.trim() || "untitled_column";
 const cType = (c) => c.type.trim() || "text";
+// Shared with the mock database (js/mock/setup.js), so both write names the same way.
+export { q as quoteIdent, tName, cName };
 
 export function toDDL(tables) {
   if (!tables.length) return "-- No tables yet.";

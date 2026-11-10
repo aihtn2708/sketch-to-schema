@@ -89,7 +89,7 @@ function renderAnswer() {
   }
   if (a.sql) {
     html += `<div class="sql-block">
-      <div class="sql-head"><span class="eyebrow">SQL</span><span class="actions"><span class="copied" id="askCopied" role="status"></span><button type="button" id="askCopy">${svgIcon("copy")}Copy</button></span></div>
+      <div class="sql-head"><span class="eyebrow">SQL</span><span class="actions"><span class="copied" id="askCopied" role="status"></span><button type="button" id="askCopy">${svgIcon("copy")}Copy</button><button type="button" id="askRunMock" title="Run this query in Test on mock data">${svgIcon("play")}Run on mock data</button></span></div>
       <pre class="code" id="askSql" tabindex="0">${highlight(a.sql)}</pre></div>`;
   }
   if (a.explanation) html += `<p class="ans-expl">${esc(a.explanation)}</p>`;
@@ -165,6 +165,9 @@ answerEl.addEventListener("click", (e) => {
     const x = state.queries.find((q) => q.id === shownId);
     if (x) { input.value = x.question; dialectSel.value = x.dialect; }
     ask({ force: true });
+  } else if (e.target.closest("#askRunMock")) {
+    const x = state.queries.find((q) => q.id === shownId);
+    if (x?.answer.sql) emit("mock:run", { sql: x.answer.sql, name: x.question, dialect: x.dialect });
   } else if (e.target.closest("#askCopy")) {
     const done = (m) => { const c = $("#askCopied"); if (c) { c.textContent = m; setTimeout(() => { c.textContent = ""; }, 2500); } };
     const text = state.queries.find((q) => q.id === shownId)?.answer.sql || "";

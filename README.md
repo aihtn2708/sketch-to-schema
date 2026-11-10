@@ -1,6 +1,6 @@
 # Sketch to Schema
 
-Turn a whiteboard photo, or a diagram drawn on screen, into a draft database schema, review it, and copy PostgreSQL DDL or DBML.
+Turn a whiteboard photo, or a diagram drawn on screen, into a draft database schema, review it, and copy PostgreSQL DDL or DBML. Then ask questions in plain language to get SQL, and test queries on a mock PostgreSQL database with generated sample data, all in the browser.
 
 It's a static site: plain HTML, CSS and JavaScript modules, with no build step and no server. Each person adds their own API key (OpenRouter, Gemini, ChatGPT, Claude or DeepSeek), which stays in their browser and is sent only to the provider they pick. Work is saved as projects in the browser.
 
@@ -44,7 +44,7 @@ Notes:
 
 ## Projects
 
-Everything on the page (the photo or drawing, the draft schema, the diagram layout and the questions you asked) is saved as a **project** in your browser, automatically as you work.
+Everything on the page (the photo or drawing, the draft schema, the diagram layout, the questions you asked, and the mock database's sample data and tests) is saved as a **project** in your browser, automatically as you work.
 
 - **New** starts a blank project. Rename it in the box at the top.
 - **Projects** lists your projects with a preview: open, duplicate, export or delete them, and search by name.
@@ -83,9 +83,17 @@ Projects live in this browser only. Clearing site data, or a private window, rem
   - The chips under the box are starter questions made from the draft's relationships. They cost nothing until you press Ask.
   - Answers are saved with the project. Asking the same question again shows the saved answer without a request; **Ask again** gets a fresh one. If the draft changed since, the answer says so.
 
+- **Test on mock data:** a real PostgreSQL database built from the draft schema, running inside your browser. Nothing is sent anywhere and no AI request is made.
+  - **Sample data** is generated from each column's name and type: names, emails, cities, prices, quantities, and dates spread over the last three years. Foreign keys point at real parent rows, tables that point to another table get 4 times as many rows, and about 1 parent in 5 gets no child rows, so "with no …" questions have answers. Set **Rows per table** and press **New sample data** for a fresh set (**Undo** brings the old one back).
+  - The **Sample data** tab shows the INSERT statements. Edit them to add the exact rows a test needs. Sketched types are changed to ones PostgreSQL accepts (`datetime` → `timestamp`, `money` → `numeric(12,2)`); open **Schema used for the mock database** to see the result.
+  - **Query:** write SQL and press **Run** (Ctrl/⌘+Enter). Click a table name to see its rows. Anything a query changes (INSERT, UPDATE, DELETE, even DROP) is undone after the run, so every run starts from the same data. **Stop** ends a query that takes too long.
+  - **Save as test** keeps the query and its current result. **Run all tests** runs them again and shows which ones now give a different result and how (for example *Expected 4 rows, got 5. New: (Nobody Here, Hanoi).*). Row order only counts when the query has `ORDER BY`. If the new result is right, press **Accept new result**.
+  - On an Ask answer, **Run on mock data** runs its SQL here, and **Save as test** then names the test after the question.
+  - The first run downloads the database engine (about 5 MB, from cdn.jsdelivr.net) and takes a few seconds; after that the browser keeps it. If your network blocks that site, see *Mock database engine* below.
+
 ### Requests per day
 
-Each Extract is 1 request (up to 4 for a very large diagram), and each new question is 1 request. Nothing else calls the AI: editing, the diagram, export, starter questions and saved answers are all free. The AI connection panel shows how many requests this browser has made today, so a team can see it staying well under 100 a day.
+Each Extract is 1 request (up to 4 for a very large diagram), and each new question is 1 request. Nothing else calls the AI: editing, the diagram, export, starter questions, saved answers and the whole mock database (data, queries, tests) are all free. The AI connection panel shows how many requests this browser has made today, so a team can see it staying well under 100 a day.
 
 Typed text in Draw mode is much easier for the models to read than mouse handwriting, so prefer the Text tool for names.
 
@@ -103,7 +111,7 @@ Then open http://localhost:8000. In the browser console, `s2s.state` shows the a
 
 ### Run the tests
 
-The tests cover the logic that doesn't need a browser: reading model replies, building the draft, DDL/DBML export, checking saved drawings, and the Ask prompt, SQL check and Venn diagram. They need Node.js 20 or newer and nothing else:
+The tests cover the logic that doesn't need a browser: reading model replies, building the draft, DDL/DBML export, checking saved drawings, the Ask prompt, SQL check and Venn diagram, and the mock database's types, sample data and test comparison. They need Node.js 20 or newer and nothing else:
 
 ```bash
 node --test "tests/*.test.js"    # or: npm test
@@ -151,6 +159,14 @@ js/
     check.js                finds tables and columns in the SQL that aren't in the draft
     venn.js                 Venn diagram drawing and join names
     ask-panel.js            the Ask panel UI, history, reusing saved answers
+  mock/
+    setup.js                sketched types → PostgreSQL types; CREATE TABLE and foreign-key steps
+    generate.js             sample data from column names and types (seeded, repeatable)
+    compare.js              tests: result fingerprints, comparing results, explaining differences
+    saved.js                the mock database's part of a project, and cleaning it on load
+    db.js                   starts and talks to the worker; the engine's CDN address and version
+    worker.js               runs PostgreSQL (PGlite) in a background worker
+    mock-panel.js           the Test on mock data panel
   projects/
     db.js                   IndexedDB storage
     projects.js             autosave, project bar, Projects list, import/export
@@ -161,7 +177,7 @@ tests/                      node --test unit tests for the pure logic
 
 - **Shared state lives in `js/state.js`.** Modules read and change `state` there instead of keeping their own copies.
 - **Modules announce changes with events** instead of calling each other. For example, the editor emits `draft:edited` after a field changes; the export panel listens and refreshes, and the projects module listens for `dirty` and autosaves.
-- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js`, `diagram/layout.js` and `query/prompt.js`, `check.js`, `venn.js` never touch the page, which is why they can be tested with plain Node.
+- **Logic is kept apart from the page.** `schema/model.js`, `schema/export.js`, `providers/prompt.js`, `sketch/shapes.js`, `diagram/layout.js` and `query/prompt.js`, `check.js`, `venn.js` and `mock/setup.js`, `generate.js`, `compare.js` never touch the page, which is why they can be tested with plain Node.
 
 ### Common changes
 
@@ -171,5 +187,7 @@ tests/                      node --test unit tests for the pure logic
 - **Change what the model is asked:** edit `PROMPT` (and `SCHEMA` if the shape changes) in `js/providers/prompt.js`, then run the tests.
 - **Change how questions are answered:** edit `askPrompt` (and `ASK_SCHEMA` if the shape changes) in `js/query/prompt.js`, then run `tests/query.test.js`.
 - **Change the SQL or DBML output:** edit `js/schema/export.js` and add a test in `tests/export.test.js`.
+- **Change the sample data:** value rules (by column name and type) are in `js/mock/generate.js`, with tests in `tests/mock.test.js`.
+- **Mock database engine:** PostgreSQL compiled to WebAssembly ([PGlite](https://pglite.dev)), loaded from cdn.jsdelivr.net at the version pinned in `js/mock/db.js`. To serve it from this site instead (for networks that block the CDN), copy every `.js` file (keep the `fs/` folder too) plus `pglite.wasm`, `pglite.data` and `initdb.wasm` from the `dist` folder of `@electric-sql/pglite` at that version into `js/vendor/pglite/` (about 17 MB; skip the `.map`, `.d.ts` and `.tar.gz` files), and set `PGLITE_URL` to `new URL("../vendor/pglite/index.js", import.meta.url).href`.
 - **Change colors or fonts:** edit `css/tokens.css`. The Diagram view reads the same colors, so it follows.
 - **Change how the diagram looks or is arranged:** card drawing is in `js/diagram/diagram.js`; sizes, arrangement and line routing are in `js/diagram/layout.js` (with tests in `tests/diagram.test.js`).
